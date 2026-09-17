@@ -1,0 +1,98 @@
+# ─────────────────────────────────────────────
+# Unity 표준 (github/gitignore Unity.gitignore 기반)
+# 앞에 **/ 를 붙여서 Unity 프로젝트가 하위 폴더(unity/ 등)에 있어도 동작
+# ─────────────────────────────────────────────
+**/[Ll]ibrary/
+**/[Tt]emp/
+**/[Oo]bj/
+**/[Bb]uild/
+**/[Bb]uilds/
+**/[Ll]ogs/
+**/[Uu]ser[Ss]ettings/
+**/[Mm]emoryCaptures/
+**/[Rr]ecordings/
+**/[Aa]ssets/Plugins/Editor/JetBrains*
+
+# IDE / 자동 생성
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+.gradle/
+.consulo/
+ExportedObj/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# 빌드 결과물
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.unitypackage.meta
+*.app
+crashlytics-build.properties
+
+# Addressables 빌드 캐시
+**/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+**/[Aa]ssets/[Ss]treamingAssets/aa.meta
+**/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# ─────────────────────────────────────────────
+# Unreal 표준
+# ─────────────────────────────────────────────
+**/Binaries/
+**/Intermediate/
+**/DerivedDataCache/
+**/Saved/
+*.xcodeproj
+*.xcworkspace
+
+# ─────────────────────────────────────────────
+# Godot 표준 (4+)
+# ─────────────────────────────────────────────
+**/.godot/
+**/.mono/
+data_*/
+mono_crash.*.json
+
+# AI 개인 설정 — 사람마다 경로·키가 달라서 올리지 않는다
+.mcp.json
+/loop/mcp.json
+.claude/settings.local.json
+
+# OS 찌꺼기
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python (tools/check_conventions.py 등)
+__pycache__/
+*.pyc
+
+# ─────────────────────────────────────────────
+# 루프 전용 (플레이북)
+# ─────────────────────────────────────────────
+/logs/
+/loop/STOP
+/loop/WRAPUP
+/loop/.lock
+/captures/tmp/
+# AI 이미지 생성 원본(대용량) — 고른 것만 Assets 로 옮긴다
+/_Source/raw/
