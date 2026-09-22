@@ -69,7 +69,7 @@ nap() {
 }
 
 # 계정 한도 판정 — 문구는 자주 바뀌니 넓게 잡고, 최종 판단은 "커밋이 0개였나"와 합쳐서 한다 (아래)
-LIMIT_RE='usage.?limit|rate.?limit|limit.?reached|hit your limit|weekly limit|quota|credit balance|insufficient credit|out of credits|too many requests|overloaded|resets? at|billing|\b429\b|\b529\b'
+LIMIT_RE='usage.?limit|session limit|hit your|rate.?limit|limit.?reached|hit your limit|weekly limit|quota|credit balance|insufficient credit|out of credits|too many requests|overloaded|resets? at|billing|\b429\b|\b529\b'
 
 idle=0
 count=0
