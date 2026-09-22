@@ -45,7 +45,7 @@
 3. 조각이 크면 `docs/templates/FeatureSpec.md` 로 `docs/specs/` 에 명세부터 (그게 이번 조각).
 4. STATUS 맨 위에 새 바퀴 머리줄 + **계획 한 줄** (조각 ID · 고른 이유 · 만들 파일 · 위치 · 레퍼런스 근거가 있으면 그 절).
 5. **만들기** — 컨벤션 문서대로. 콘텐츠면 `new-content` 스킬 절차, 코드면 `new-script` 스킬 절차. 스킬의 "승인" 단계는 STATUS 계획 줄로 대신하고, 에디터 변경(컴포넌트 부착·씬 저장)도 **이번 조각 범위 안이면 진행**한다.
-6. **검사** 1층 → 2층 → 3층 (`Verification.md`, `docs/checks/<엔진>.md`). 테스트는 테스트 전용 값으로 (밸런스 숫자가 바뀌어도 안 깨지게). 3층은 **레퍼런스 나란히 비교**(Reference.md 체크리스트)까지. 각 층의 **실제 명령 출력 마지막 줄**을 STATUS 검사 칸에 인용한다 — 인용이 없으면 그 층은 "못 함".
+6. **검사** 1층 → 2층 → 3층 (`Verification.md`, `docs/checks/<엔진>.md`). 테스트는 테스트 전용 값으로 (밸런스 숫자가 바뀌어도 안 깨지게). 3층은 **레퍼런스 나란히 비교**(Reference.md 체크리스트)까지. 각 층의 **실제 명령 출력 마지막 줄**을 STATUS 검사 칸에 인용한다 — 인용이 없으면 그 층은 "못 함". 인용마다 `python3 tools/jev.py evidence "<무슨 검사 통과>" "<인용>"` 를 돌려 `SUPPORTED` 일 때만 "통과" (Verification.md 1). 엔진 로그 `Error:` 줄은 `tools/jev.py noise` 로 거른다 (Verification.md 9).
 7. 1층 통과하면 **캡처 보기 전에 일단 커밋** (⑤). 2·3층에서 문제 나오면 같은 바퀴에서 고치고 `fix` 커밋.
 8. ROADMAP 조각 `[x]`, 끝난 INBOX 항목 삭제, 사용자에게 보이는 변화면 CHANGELOG `[Unreleased]` 한 줄.
 9. STATUS 기록 완성 + **"지금 상태" 갱신** → 커밋 `docs(status): #<바퀴> <조각 ID> <요지>`.

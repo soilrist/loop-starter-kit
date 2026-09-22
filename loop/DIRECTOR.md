@@ -32,7 +32,7 @@
 2. 새 커밋마다:
    - `git show --stat` → 조각 섞임·사이드카 파일 짝(엔진에 있으면, 예 Unity `.meta`)·`Loop:`/`Slice:` 꼬리말
    - `python3 tools/check_conventions.py` → 오류 0 인지 (훅이 막았겠지만 한 번 더)
-   - STATUS 기록의 검사 칸이 정직한지: **"통과"에 실제 명령 출력 인용이 없으면** INBOX `결함`. 인용이 있어도 `logs/lap-<번호>.log` 에서 그 명령이 정말 돌았는지 한 번 대조한다 (이름·문구만 보고 믿지 않는다)
+   - STATUS 기록의 검사 칸이 정직한지: **"통과"에 실제 명령 출력 인용이 없으면** INBOX `결함`. 인용이 있어도 `logs/lap-<번호>.log` 에서 그 명령이 정말 돌았는지 한 번 대조한다 (이름·문구만 보고 믿지 않는다). 대조 결과가 의심스러우면 `python3 tools/jev.py verdict "<지적 + 근거>"` → `CONFIRMED` 만 `결함`, `PLAUSIBLE` 은 `확인` (Verification.md 10)
    - 캡처가 있으면 직접 열어 Verification.md 체크리스트로 본다. UI·캐릭터 조각이면 **레퍼런스 시트(`docs/reference/`)와 나란히** 보고, 자리표시 품질이면 `결함`
    - ROADMAP·DESIGN 에 없는 것이 🟢 로 조용히 들어왔으면 `결함` (🟡 `확인` 으로 올렸어야 함)
    - 필요하면 `convention-checker` 에이전트에 **파일 목록을 넘겨** 점검 (한 바퀴 1회까지)

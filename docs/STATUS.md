@@ -16,7 +16,7 @@
 - 계획: 폴더 구조 + asmdef 4개 / Assets/_Project/Scripts/* — 고른 이유: ROADMAP M0 첫 `[ ]`
 - 한 것: 
 - 커밋: 〔해시〕
-- 검사: 1층 통과(`✔ 규칙 검사 통과 (경고 0 / 미정 숫자 0)`) / 2층 못 함(코드 없음) / 3층 못 함(화면 없음) — 통과엔 실제 출력 마지막 줄 인용, 보이는 조각이면 `3층 통과(레퍼런스 대조: docs/reference/<대상>.md)`
+- 검사: 1층 통과(`✔ 규칙 검사 통과 (경고 0 / 미정 숫자 0)`, jev SUPPORTED 0.79) / 2층 못 함(코드 없음) / 3층 못 함(화면 없음) — 통과엔 실제 출력 마지막 줄 인용 + `tools/jev.py evidence` 판정, 보이는 조각이면 `3층 통과(레퍼런스 대조: docs/reference/<대상>.md)`
 - 점검한 규칙: FolderStructure, CodingStyle(R08·R11·R14), GitCommit
 - 가정한 것(🟡): 없음
 - 물은 것(🔴): 없음

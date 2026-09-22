@@ -1,4 +1,4 @@
-# 루프 스타터 키트 v2.1 (확정)
+# 루프 스타터 키트 v2.1.1 (확정)
 
 **"이거 만들어!" 한마디면 알아서 만들고, 정말 필요할 때만 물어보는 AI 개발팀**을 게임 프로젝트에 심는 키트예요.
 
@@ -21,6 +21,7 @@
 | 설계에 없는 걸 조용히 추가 | 설계서에 없는 것은 항상 🟡 `확인` |
 | 계정 콘솔처럼 사람만 할 수 있는 일이 묻힘 | `[!] 사람:` 표시 → 감독 보고 **맨 앞** |
 | "커밋 안 된 변경" 경고가 매 바퀴 | 루프 자신의 상태 파일은 제외, 남은 파일 목록을 `alerts.log` 에 같이 기록 |
+| (v2.1.1) 일꾼이 자기 결과를 자기가 채점 | **Jev(TypeSafe) 제3 판정기** `tools/jev.py`: 통과 인용은 `evidence` 가 SUPPORTED 일 때만, 엔진 `Error:` 줄은 `noise` 로 거르고, 결함 지적은 `verdict` CONFIRMED 만 INBOX 로 |
 
 ## 확정된 규칙
 | 항목 | 정한 것 | 이유 |
@@ -41,6 +42,7 @@
 | `.claude/settings.json` | 위험 명령 차단 (`git add -A`, `push --force`, `rm -rf` …) |
 | `.githooks/` | 커밋 메시지 형식·규칙 위반을 **커밋 순간에 막음** |
 | `tools/check_conventions.py` | 이름·엔진별 사이드카 파일·코드 접두어·안 채운 숫자·레퍼런스 시트 유무 자동 검사 (점검한 규칙 목록 출력) |
+| `tools/jev.py` | Jev(TypeSafe System One) 제3 판정기 — `evidence`(통과 인용이 진짜인가) · `noise`(엔진 에러 줄이 잡음인가) · `verdict`(결함 지적이 진짜인가) · `selftest`. 키는 Keychain `typesafe-api-key` 또는 `TYPESAFE_API_KEY` |
 | `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기) |
 | `docs/DESIGN.md` `ROADMAP.md` `STATUS.md` `feedback/INBOX.md` | 기획서·조각 목록·바퀴 기록·우편함 |
 | `docs/templates/` | 기능 명세·버그·결정·사고기록 양식 |
@@ -51,7 +53,7 @@
 압축을 풀어 둔 뒤, **프로젝트 폴더를 연 Code 탭 세션**에 아래를 그대로 붙여넣으세요.
 
 ```
-루프 스타터 키트 v2.1 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
+루프 스타터 키트 v2.1.1 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
 키트의 README.md "설치 규칙"을 먼저 읽고 그대로 따라 줘.
 끝나면 결과를 5줄로 보고하고, 내가 정해야 할 것만 모아서 물어봐.
 루프는 아직 켜지 마.
@@ -91,8 +93,9 @@
    - `loop/ctl.sh try` 로 claude 를 부르지 않는 시험 두 바퀴를 돌린다 (번호는 `logs/lap.dry` 에 따로 셈).
    - `logs/usage.csv` 에 `dry` 두 줄이 생겼는지 확인한다.
    - `command -v claude` 와 `~/.claude-loop-nc` 폴더가 있는지 확인해 보고한다.
+   - `python3 tools/jev.py selftest` 가 `SELFTEST_OK` 인지 확인한다. `UNAVAILABLE` 이면 키·SDK(`~/.claude/scripts/.venv`) 문제 — 고치지 말고 보고만 (루프는 `통과(jev 미확인)` 로 돌 수 있음).
 9. **커밋**
-   - `chore(loop): 루프 스타터 키트 v2.1 설치` 로 커밋한다 (훅 통과 확인).
+   - `chore(loop): 루프 스타터 키트 v2.1.1 설치` 로 커밋한다 (훅 통과 확인).
    - 사람이 확인한 뒤에만 커밋한다.
 10. **보고**: 설치된 것 / 합친 파일 / 기존 위반 수 / 사람이 정할 것.
 
@@ -120,4 +123,5 @@
 - 커밋: Conventional Commits 1.0
 - 버전: SemVer 2.0
 - 변경기록: Keep a Changelog 1.1
+- Jev 판정기: TypeSafe 공식 문서 docs.typesafe.ai (System One · Python SDK · citation_check 쿡북), 플러그인 `typesafe@typesafe-ai`
 - 설정 구조(CLAUDE.md·규칙 문서·스킬·검사 에이전트·MCP 경계): "유니티 팀 프로젝트 AI 설정" 교재 (엔진 무관 구조로 일반화)
