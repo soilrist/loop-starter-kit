@@ -96,3 +96,5 @@ __pycache__/
 /captures/tmp/
 # AI 이미지 생성 원본(대용량) — 고른 것만 Assets 로 옮긴다
 /_Source/raw/
+# 레퍼런스 게임 캡처(남의 저작물) — 글로 풀어 쓴 docs/reference/*.md 만 깃에
+/_Source/reference/

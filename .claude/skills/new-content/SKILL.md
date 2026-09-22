@@ -7,7 +7,7 @@ description: 몬스터·아이템·스킬·퀘스트·대사 같은 게임 콘�
 2. `docs/DESIGN.md` 에서 해당 콘텐츠 항목을 grep 으로 찾는다 (통째로 읽지 않음).
 3. 이미 있는 데이터 틀을 쓴다 (엔진별 코드 위치·형식은 `docs/engines/<엔진>.md`). 틀이 없을 때만 new-script 절차로 틀을 만든다.
 4. 데이터 에셋을 엔진별 이름·폴더 규칙대로 만든다 (에디터/엔진 MCP 로, 구체 규칙·예시는 `docs/engines/<엔진>.md`).
-5. DESIGN 에 있는 숫자만 채운다. 없는 숫자는 `-1` 로 두고 INBOX 에 `질문` 을 한 줄로 모아 남긴다 (형식은 `InboxFormat.md`).
+5. 숫자는 DESIGN §6 에서 가져온다. 없으면 **레퍼런스 값·장르 관례·기존 숫자와의 비율로 정해 §6 표에 `값 | 단위 | 근거` 를 먼저 적고** 데이터에 넣는다 (`DataDriven.md` 3). `-1` 을 커밋에 남기지 않는다. 그림이 딸린 콘텐츠(캐릭터·무기·아이콘)는 `docs/reference/<대상>.md` 시트부터 (`Reference.md` §2).
 6. ID 는 `분류.대상` 소문자 (`enemy.goblin`) — 에셋 이름에서 기계적으로 만든다. 기존 ID 와 겹치지 않는지 확인.
 7. `python3 tools/check_conventions.py --changed` 로 이름·자리표시 경고를 확인하고 보고한다.
 

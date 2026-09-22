@@ -7,15 +7,16 @@
 - 마일스톤: M0 〔이름〕 — 〔n/m 조각〕
 - 브랜치: develop
 - 막힌 것: 없음
-- 사람 답 기다리는 것: 🔴 〔n〕개 / 🟡 가정 〔n〕개 / 미정 숫자 〔check_conventions R12 수〕개
+- 사람만 할 수 있는 것(`[!] 사람:`): 없음
+- 사람 답 기다리는 것: 🔴 〔n〕개 / 🟡 가정 〔n〕개 / 안 채운 숫자 〔check_conventions R12 수〕개 (0 이어야 정상)
 
 ---
 
 ## #0001 · YYYY-MM-DD HH:MM · 조각 M0-01
-- 계획: 폴더 구조 + asmdef 4개 / Assets/_Project/Scripts/*
+- 계획: 폴더 구조 + asmdef 4개 / Assets/_Project/Scripts/* — 고른 이유: ROADMAP M0 첫 `[ ]`
 - 한 것: 
 - 커밋: 〔해시〕
-- 검사: 1층 통과 / 2층 못 함(코드 없음) / 3층 못 함(화면 없음)
+- 검사: 1층 통과(`✔ 규칙 검사 통과 (경고 0 / 미정 숫자 0)`) / 2층 못 함(코드 없음) / 3층 못 함(화면 없음) — 통과엔 실제 출력 마지막 줄 인용, 보이는 조각이면 `3층 통과(레퍼런스 대조: docs/reference/<대상>.md)`
 - 점검한 규칙: FolderStructure, CodingStyle(R08·R11·R14), GitCommit
 - 가정한 것(🟡): 없음
 - 물은 것(🔴): 없음

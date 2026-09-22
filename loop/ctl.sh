@@ -57,7 +57,8 @@ case "${1:-status}" in
       rm -f "$LOOP_DIR/STOP" "$LOOP_DIR/WRAPUP"
       exit 0
     fi
-    [ -z "$(git status --porcelain | grep -v ' loop/env.sh$')" ] || { echo "✖ 커밋 안 된 변경이 있음 — 먼저 커밋"; git status --short; exit 1; }
+    # 루프 자신의 상태 파일(loop/·logs/·captures/tmp/ 의 추적 안 되는 파일)은 "커밋 안 된 변경"이 아니다 — 재시작을 스스로 막던 원인
+    [ -z "$(git status --porcelain | grep -vE ' loop/env\.sh$|^\?\? (loop/|logs/|captures/tmp/)')" ] || { echo "✖ 커밋 안 된 변경이 있음 — 먼저 커밋"; git status --short; exit 1; }
     rm -f "$LOOP_DIR/STOP" "$LOOP_DIR/WRAPUP"
     write_plist
     if launchctl print "gui/$UID_NUM/$LOOP_LABEL" >/dev/null 2>&1; then

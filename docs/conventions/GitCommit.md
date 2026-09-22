@@ -62,4 +62,5 @@ Inbox: 고블린 이동속도
 ## 감독이 거절하는 커밋
 - 루프 커밋인데 조각 작업에 `Slice:` 없음 (`Loop:`·`Checks:` 는 훅이 막음)
 - 여러 조각이 섞임 / `.meta` 짝 없음
-- `Checks:` 에 "pass" 인데 STATUS·캡처에 흔적 없음
+- `Checks:` 에 "pass" 인데 STATUS 에 실제 명령 출력 인용이 없거나, `logs/lap-<번호>.log` 에 그 명령이 없음
+- UI·캐릭터·아이템 조각인데 레퍼런스 시트 대조 없이 3층 "pass"

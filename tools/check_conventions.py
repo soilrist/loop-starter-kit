@@ -155,9 +155,10 @@ RULES = {
     "R09": "CodingStyle - public 필드 대신 [SerializeField] private [Unity(C#) 전용]",
     "R10": "CodingStyle - TODO 주석 금지 [Unity(C#) 전용]",
     "R11": "CodingStyle - namespace 필수 [Unity(C#) 전용]",
-    "R12": "DataDriven - 미정 숫자(-1/TBD) 목록",
+    "R12": "DataDriven - 안 채운 숫자(-1/TBD) 목록 — 루프가 DESIGN §6 에 근거와 함께 채울 것",
     "R13": "AssetNaming - AI 생성 에셋 라이선스 기록(_Source/LICENSES.md)",
     "R14": "CodingStyle - 필드 접두어 (m_ 멤버 · k_ 상수 · s_ 스태틱, Unity 공식) [Unity(C#) 전용]",
+    "R15": "Reference - Art/UI 에셋이 있으면 레퍼런스 시트(docs/reference/*.md)가 있어야 함",
 }
 
 
@@ -375,7 +376,7 @@ def check_placeholders(rep: Report, path: Path, rel: str) -> None:
     for m in PLACEHOLDER_RE.finditer(text):
         line_no = text.count("\n", 0, m.start()) + 1
         line = text.splitlines()[line_no - 1].strip()
-        rep.warn("R12", f"{rel}:{line_no}", f"사람이 정할 숫자: {line}")
+        rep.warn("R12", f"{rel}:{line_no}", f"안 채운 숫자 (DESIGN §6 에 근거와 함께 정할 것): {line}")
 
 
 def git_lines(repo: Path, *args: str) -> list[str]:
@@ -472,6 +473,15 @@ def run(repo: Path, content_dirs: list[Path], only: set[Path] | None, profile: d
         if not (repo / "_Source" / "LICENSES.md").is_file():
             rep.err("R13", "_Source/LICENSES.md", "생성·외부 에셋이 있는데 라이선스 기록 파일이 없음")
 
+    # 레퍼런스 시트 — 보이는 에셋이 있는데 시트가 하나도 없으면 경고 (Reference.md §2)
+    # ponytail: 폴더 단위 존재 검사만. 에셋↔시트 1:1 대응은 감독이 캡처 검수 때 본다
+    visible = [p for c in content_dirs for name in ("Art", "UI")
+               for p in [c / project_dir / name] if p.is_dir() and any(p.rglob("*"))]
+    if visible:
+        rep.checked.add("R15")
+        if not any((repo / "docs" / "reference").glob("*.md")):
+            rep.warn("R15", "docs/reference/", "Art/UI 에셋이 있는데 레퍼런스 시트가 없음 — 대충 비슷하게 만든 흔적")
+
     for rid in RULES:
         if rid not in rep.checked and rid not in rep.not_checked:
             rep.not_checked[rid] = "해당 파일 없음"
@@ -524,7 +534,7 @@ def main() -> int:
           f"{'  (바뀐 파일만)' if only is not None else ''}")
     show("오류 — 커밋 금지", rep.errors)
     show("경고", others)
-    show("사람이 정할 숫자", placeholders)
+    show("안 채운 숫자 (루프가 DESIGN §6 에 근거와 함께 채울 것)", placeholders)
 
     print("\n### 점검한 규칙")
     for rid in sorted(rep.checked):

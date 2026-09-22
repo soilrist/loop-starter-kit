@@ -1,4 +1,4 @@
-# 검사 모듈: Unity  〔DRAFT — 사람 승인 후 DRAFT 표시 삭제〕
+# 검사 모듈: Unity  (조선제일검 루프에서 검증됨, 2026-09)
 
 > 공통 원칙은 `docs/conventions/Verification.md`. 여기엔 **Unity 에서 실제로 어떻게** 만 적는다.
 > Unity MCP 가 연결돼 있으면 MCP 명령, 없으면 배치 모드 명령. 둘 다 안 되면 그 층은 **"못 함"**.

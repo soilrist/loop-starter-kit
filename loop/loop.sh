@@ -68,7 +68,8 @@ nap() {
   done
 }
 
-LIMIT_RE='usage limit|rate limit|limit reached|quota|credit balance|too many requests|429'
+# 계정 한도 판정 — 문구는 자주 바뀌니 넓게 잡고, 최종 판단은 "커밋이 0개였나"와 합쳐서 한다 (아래)
+LIMIT_RE='usage.?limit|rate.?limit|limit.?reached|hit your limit|weekly limit|quota|credit balance|insufficient credit|out of credits|too many requests|overloaded|resets? at|billing|\b429\b|\b529\b'
 
 idle=0
 count=0
@@ -108,6 +109,7 @@ while :; do
   pre="$(git rev-parse HEAD)"
   started=$(date +%s)
   out="logs/lap-$(printf '%05d' "$lap").log"
+  ln -sf "$(basename "$out")" logs/lap-latest.log   # 고정 경로 — 감독·검사 스크립트가 파일 이름을 추측하지 않게
 
   prompt="너는 루프 일꾼이다. 바퀴 번호는 ${lap} 이다. loop/PROMPT.md 를 읽고 그 순서대로 이번 바퀴 하나만 수행하고 끝내라. 커밋 꼬리말 Loop: ${lap} 을 잊지 마라."
 
@@ -141,8 +143,9 @@ while :; do
       rc=$?
     fi
 
-    if [ $rc -ne 0 ] && grep -Eiq "$LIMIT_RE" "$out"; then
-      log "계정 $used_account 한도 → 다음 계정"
+    # 한도 = 한도 문구가 있고 + 실제로 커밋을 하나도 못 남겼을 때 (종료 코드만 믿지 않는다 — 0 으로 끝나며 한도 문구만 남긴 경우가 있었다)
+    if [ "$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)" = "0" ] && grep -Eiq "$LIMIT_RE" "$out"; then
+      log "계정 $used_account 한도 → 다음 계정 (rc=$rc)"
       note="limit:$used_account"
       continue
     fi
@@ -160,9 +163,12 @@ while :; do
   log "바퀴 #$lap 끝 — 종료코드 $rc, 커밋 $commits(일 $work), ${secs}초 ${note}"
 
   # 작업 트리에 커밋 안 된 루프 흔적이 남았는지
-  # (loop/env.sh 는 감독이 설정을 바꾸는 파일이라 제외)
-  if [ "$LOOP_DRY_RUN" != "1" ] && [ -n "$(git status --porcelain 2>/dev/null | grep -v ' loop/env.sh$')" ]; then
+  # 제외: loop/env.sh(감독 설정) · loop/ logs/ captures/tmp/ 의 추적 안 되는 파일(루프 자신의 상태 파일)
+  # 남은 파일 목록을 alerts.log 에 같이 적는다 — "매 바퀴 경고만 뜨고 원인을 모르는" 일이 없게
+  dirty="$(git status --porcelain 2>/dev/null | grep -vE ' loop/env\.sh$|^\?\? (loop/|logs/|captures/tmp/)')"
+  if [ "$LOOP_DRY_RUN" != "1" ] && [ -n "$dirty" ]; then
     alert "바퀴 #$lap 뒤에 커밋 안 된 변경이 남음 — 감독 확인 필요"
+    printf '%s\n' "$dirty" | sed 's/^/    /' >> logs/alerts.log
   fi
 
   count=$((count + 1))
