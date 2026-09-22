@@ -34,12 +34,13 @@
 | 파일 | 하는 일 |
 |---|---|
 | `CLAUDE.md` | 모든 AI가 제일 먼저 읽는 한 장 |
-| `docs/conventions/` | 규칙 원문 (이름·폴더·코드·데이터·커밋·브랜치·버전·검사·INBOX·**자율 판단**) |
+| `docs/conventions/` | 규칙 원문 (이름·폴더·코드·데이터·커밋·브랜치·버전·검사·INBOX·**자율 판단**·**레퍼런스 충실**) |
+| `docs/reference/` | 레퍼런스 시트 (화면·캐릭터마다 한 장 — 만들기 전에 쓰고, 캡처와 나란히 대조) |
 | `.claude/skills/` | `kickoff`(한마디→설계·로드맵), `new-script`, `new-content`, `commit`, `inbox`, `release` |
 | `.claude/agents/convention-checker.md` | 읽기 전용 규칙 점검 AI |
 | `.claude/settings.json` | 위험 명령 차단 (`git add -A`, `push --force`, `rm -rf` …) |
 | `.githooks/` | 커밋 메시지 형식·규칙 위반을 **커밋 순간에 막음** |
-| `tools/check_conventions.py` | 이름·엔진별 사이드카 파일·코드 접두어·미정 숫자 자동 검사 (점검한 규칙 목록 출력) |
+| `tools/check_conventions.py` | 이름·엔진별 사이드카 파일·코드 접두어·안 채운 숫자·레퍼런스 시트 유무 자동 검사 (점검한 규칙 목록 출력) |
 | `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기) |
 | `docs/DESIGN.md` `ROADMAP.md` `STATUS.md` `feedback/INBOX.md` | 기획서·조각 목록·바퀴 기록·우편함 |
 | `docs/templates/` | 기능 명세·버그·결정·사고기록 양식 |
