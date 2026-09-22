@@ -2,15 +2,17 @@
 """Jev(TypeSafe System One) 제3 판정기 — 일꾼·감독이 자기 결과를 자기가 채점하지 않게.
 
 사용:
-  python3 tools/jev.py evidence "<주장>" "<인용한 명령 출력>"   → SUPPORTED | NOT_SUPPORTED
+  python3 tools/jev.py evidence "<주장>" "<인용한 명령 출력>" [pass|fail]  → SUPPORTED | NOT_SUPPORTED
+      pass(기본) = "검사가 통과했다"는 주장 · fail = "일부러 깨서 검사가 잡았다"(역검증)는 주장
   python3 tools/jev.py noise    "<엔진>" "<Error: 로그 줄>"       → KNOWN_NOISE | NEEDS_REVIEW
   python3 tools/jev.py verdict  "<결함 설명 + 근거>"              → CONFIRMED | PLAUSIBLE | NOT_REAL
-  python3 tools/jev.py selftest                                   → 알려진 4개 사례로 자기 검사
+  python3 tools/jev.py selftest                                   → 알려진 6개 사례로 자기 검사
 
 출력: JSON 한 줄 {"choice": ..., "p": ..., "model": ...}
 종료 코드: 0 = 긍정(SUPPORTED/KNOWN_NOISE/CONFIRMED) · 1 = 그 밖 · 2 = UNAVAILABLE(키·SDK·네트워크 없음)
 키: 환경변수 TYPESAFE_API_KEY, 없으면 macOS Keychain(service=typesafe-api-key). 평문 저장 안 함.
 """
+import inspect
 import json
 import os
 import pathlib
@@ -45,16 +47,31 @@ def _ask(state, question):
         return client.system_one(state=state, questions={"q": question})
 
 
-def evidence(claim: str, output: str) -> dict:
+EVIDENCE_INSTRUCTIONS = {
+    "pass": (
+        "`claim` says a check or test PASSED. `cited_output` is what the author pasted as the last lines "
+        "of the actual command output. Does `cited_output` genuinely demonstrate that `claim` is true? "
+        "Answer no if the output is empty, is a prose description instead of real program output, "
+        "comes from a different command or check than the claim, or shows any failure, error, "
+        "skipped/unknown result, or zero tests run."
+    ),
+    # 역검증(일부러 깨서 검사가 잡는지) — 주장이 "실패했다"인데 pass 문구는 실패가 보이면 무조건 no 라 구조적으로 못 통과했다 (Snarehaven #123~#125)
+    "fail": (
+        "`claim` says a check or test FAILED AS INTENDED (a negative / mutation test: the author broke something on "
+        "purpose to prove the check catches it). `cited_output` is what the author pasted as the last lines of the "
+        "actual command output. Does `cited_output` show that the failure really happened, for the reason the claim "
+        "states? Answer no if the output is empty, is a prose description instead of real program output, comes from "
+        "a different command or check than the claim, or shows success / pass instead of a failure."
+    ),
+}
+
+
+def evidence(claim: str, output: str, expect: str = "pass") -> dict:
+    if expect not in EVIDENCE_INSTRUCTIONS:
+        raise ValueError(f"expect 는 pass|fail 중 하나: {expect!r}")
     r = _ask(
         {"claim": claim, "cited_output": output},
-        Noul(instructions=(
-            "`claim` says a check or test PASSED. `cited_output` is what the author pasted as the last lines "
-            "of the actual command output. Does `cited_output` genuinely demonstrate that `claim` is true? "
-            "Answer no if the output is empty, is a prose description instead of real program output, "
-            "comes from a different command or check than the claim, or shows any failure, error, "
-            "skipped/unknown result, or zero tests run."
-        )),
+        Noul(instructions=EVIDENCE_INSTRUCTIONS[expect]),
     )
     p = r.nouls["q"].noul
     return {"choice": "SUPPORTED" if p >= EVIDENCE_P else "NOT_SUPPORTED", "p": round(p, 3), "model": r.model}
@@ -99,6 +116,12 @@ def selftest() -> dict:
         ("evidence", ("1층 기계 검사(check_conventions.py) 통과", "결과: 통과 (오류 0 / 경고 0 / 미정 숫자 0)"), "SUPPORTED"),
         ("evidence", ("2층 통과", "Passed: 3, Failed: 2, Skipped: 0"), "NOT_SUPPORTED"),
         ("evidence", ("2층 통과", "테스트를 돌려서 전부 잘 됐음"), "NOT_SUPPORTED"),
+        # 역검증 — 실패를 정확히 인용하면 SUPPORTED, 성공 출력을 실패 주장에 붙이면 NOT_SUPPORTED
+        ("evidence", ("역검증: 뼈 이름을 일부러 바꾸자 소켓 검사가 불일치를 잡았다",
+                      "Expected 'Socket_Tool attached to RightHand' to be RightHand, but it was LeftHand.\n"
+                      "Result={Fail} Name={SocketBoneCheck}", "fail"), "SUPPORTED"),
+        ("evidence", ("역검증: 뼈 이름을 일부러 바꾸자 소켓 검사가 불일치를 잡았다",
+                      "Result={Success} Name={SocketBoneCheck}\nPassed: 1, Failed: 0", "fail"), "NOT_SUPPORTED"),
         ("verdict", ("STATUS says '2층 통과' but logs/lap-12.log has no test command; only check_conventions ran. "
                      "Evidence: grep -c 'run_tests\\|runTests' logs/lap-12.log -> 0",), "CONFIRMED"),
     ]
@@ -113,7 +136,10 @@ def selftest() -> dict:
 if __name__ == "__main__":
     cmd, args = (sys.argv[1] if len(sys.argv) > 1 else "help"), sys.argv[2:]
     fn = {"evidence": evidence, "noise": noise, "verdict": verdict, "selftest": selftest}.get(cmd)
-    if fn is None or len(args) != fn.__code__.co_argcount:
+    if fn is not None:
+        params = inspect.signature(fn).parameters.values()
+        lo = sum(p.default is inspect.Parameter.empty for p in params)
+    if fn is None or not lo <= len(args) <= len(params):
         print(__doc__)
         sys.exit(2)
     try:

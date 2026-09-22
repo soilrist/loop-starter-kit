@@ -1,0 +1,13 @@
+schema_version: '1.0'
+name: convention-checker-report
+context:
+  scaffold_script: scaffold.sh
+execution:
+  prompt: "아래 Unity C# 파일 `Assets/_Game/Scripts/Enemy/goblinController.cs` 를 이 저장소의 규칙(`docs/conventions/CodingStyle.md`, `docs/engines/unity.md`)으로 점검하고, `convention-checker` 에이전트의 보고 형식(위반 표 / 확인 필요 / 점검한 규칙 / 못 본 규칙)대로 보고하라. 고치지 말고 보고만 하라.\n\n```csharp\nusing UnityEngine;\n\npublic class GoblinController : MonoBehaviour\n{\n    public float speed = 3.5f;\n    private Transform target;\n    // TODO: 나중에 시야 체크 넣기\n\n    void Update()\n    {\n        var player = GameObject.Find(\"Player\");\n        transform.position = Vector3.MoveTowards(transform.position, player.transform.position, speed * Time.deltaTime);\n    }\n}\n```\n"
+  max_turns: 12
+  timeout_seconds: 300
+  allowed_tools:
+  - Read
+  - Glob
+  - Grep
+  - Skill

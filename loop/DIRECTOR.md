@@ -20,7 +20,7 @@
 | "규칙 바꾸자" / 루프의 규칙 제안에 "좋아" | 감독이 컨벤션 문서·검사기·훅을 고치고 테스트 후 커밋 (`docs(conventions): …`) |
 
 ## 켜기 전 준비 점검 (하나라도 실패면 켜지 않고 보고)
-- `develop` 브랜치, 작업 트리 깨끗함
+- 작업 트리 깨끗함 (`develop` 이 아니면 `ctl.sh on` 이 옮겨 주거나 만들어 준다)
 - `git config core.hooksPath` = `.githooks`
 - ROADMAP 에 `[ ]` 조각 있음 (없으면 kickoff 먼저)
 - `python3 tools/check_conventions.py` 오류 0
@@ -32,7 +32,7 @@
 2. 새 커밋마다:
    - `git show --stat` → 조각 섞임·사이드카 파일 짝(엔진에 있으면, 예 Unity `.meta`)·`Loop:`/`Slice:` 꼬리말
    - `python3 tools/check_conventions.py` → 오류 0 인지 (훅이 막았겠지만 한 번 더)
-   - STATUS 기록의 검사 칸이 정직한지: **"통과"에 실제 명령 출력 인용이 없으면** INBOX `결함`. 인용이 있어도 `logs/lap-<번호>.log` 에서 그 명령이 정말 돌았는지 한 번 대조한다 (이름·문구만 보고 믿지 않는다). 대조 결과가 의심스러우면 `python3 tools/jev.py verdict "<지적 + 근거>"` → `CONFIRMED` 만 `결함`, `PLAUSIBLE` 은 `확인` (Verification.md 10)
+   - STATUS 기록의 검사 칸이 정직한지: **"통과"에 실제 명령 출력 인용이 없으면** INBOX `결함`. 인용이 있어도 `logs/lap-<번호>.log` 의 "실행한 도구 호출" 절에서 그 명령이 정말 돌았는지 한 번 대조한다 (이름·문구만 보고 믿지 않는다). loop.sh 가 인용을 도구 출력과 자동 대조해 불일치면 `alerts.log` 에 "검사 인용 불일치"를 올린다 — 그 줄이 있으면 대조를 건너뛰지 말고 `결함`. 대조 결과가 의심스러우면 `python3 tools/jev.py verdict "<지적 + 근거>"` → `CONFIRMED` 만 `결함`, `PLAUSIBLE` 은 `확인` (Verification.md 10)
    - 캡처가 있으면 직접 열어 Verification.md 체크리스트로 본다. UI·캐릭터 조각이면 **레퍼런스 시트(`docs/reference/`)와 나란히** 보고, 자리표시 품질이면 `결함`
    - ROADMAP·DESIGN 에 없는 것이 🟢 로 조용히 들어왔으면 `결함` (🟡 `확인` 으로 올렸어야 함)
    - 필요하면 `convention-checker` 에이전트에 **파일 목록을 넘겨** 점검 (한 바퀴 1회까지)
@@ -46,7 +46,7 @@
   > 🔴 정해 줄 것 1개: 보스전 카메라 고정/추적(추천: 고정)
   > 🟡 가정하고 진행 중 1개: 적 시야 = 화면 절반 — 다르면 말만 해줘요
   > 🔢 루프가 정한 숫자 3개 (DESIGN §6) — 바꿀 게 있으면 말만 해줘요
-- **마일스톤 끝**: "M1 끝. 한번 플레이해 봐 줘요 → 괜찮으면 main 에 올릴게요" (`release` 스킬).
+- **마일스톤 끝**: "M1 끝. 한번 플레이해 봐 줘요 → 괜찮으면 main 에 올릴게요" (`release` 스킬). 이때 `graphify-out/` 이 있으면 `/graphify . --update` 로 그래프를 새로 고친다 (루프가 `graphify query` 로 옛 구조를 보지 않게).
 - 사람이 바빠 보이면 사소한 건 보고하지 않는다. **사람 시간을 쓰는 건 🔴 뿐.**
 
 ## 규칙이 샐 때

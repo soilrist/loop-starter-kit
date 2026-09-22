@@ -50,7 +50,6 @@ case "${1:-status}" in
       exit 1
     fi
     cd "$ROOT" || exit 1
-    [ "$(git branch --show-current)" = "develop" ] || { echo "✖ develop 브랜치가 아님"; exit 1; }
     [ "$(git config core.hooksPath)" = ".githooks" ] || { echo "✖ 훅 미설치: git config core.hooksPath .githooks"; exit 1; }
     if [ -n "$(running_pid)" ]; then
       echo "✔ 이미 돌고 있음 (pid $(running_pid)) — STOP/WRAPUP 표시만 지움"
@@ -59,6 +58,11 @@ case "${1:-status}" in
     fi
     # 루프 자신의 상태 파일(loop/·logs/·captures/tmp/ 의 추적 안 되는 파일)은 "커밋 안 된 변경"이 아니다 — 재시작을 스스로 막던 원인
     [ -z "$(git status --porcelain | grep -vE ' loop/env\.sh$|^\?\? (loop/|logs/|captures/tmp/)')" ] || { echo "✖ 커밋 안 된 변경이 있음 — 먼저 커밋"; git status --short; exit 1; }
+    # develop 이 아니면 (트리가 깨끗하니) 옮겨 준다. 없으면 지금 브랜치에서 만든다 — "develop 이 아님"으로 켜기를 거부하던 것을 자동화
+    if [ "$(git branch --show-current)" != "develop" ]; then
+      if git show-ref --verify --quiet refs/heads/develop; then git checkout -q develop || exit 1; echo "✔ develop 로 이동"
+      else git checkout -q -b develop || exit 1; echo "✔ develop 브랜치를 만들어 이동"; fi
+    fi
     rm -f "$LOOP_DIR/STOP" "$LOOP_DIR/WRAPUP"
     write_plist
     if launchctl print "gui/$UID_NUM/$LOOP_LABEL" >/dev/null 2>&1; then

@@ -1,0 +1,20 @@
+schema_version: '1.0'
+name: commit-message
+context:
+  scaffold_script: scaffold.sh
+execution:
+  prompt: '너는 이 저장소의 루프 일꾼이다. 바퀴 번호 LOOP_LAP=128. 이번 바퀴에 ROADMAP 조각 M1-03 "3연타 콤보" 를 `Assets/_Game/Scripts/Combat/ComboAttack.cs` 에 구현했다.
+
+    검사 결과: 1층 `python3 tools/check_conventions.py` 마지막 줄 `✔ 규칙 검사 통과 (경고 0 / 미정 숫자 0)`, 2층 EditMode 테스트 `Passed: 3, Failed: 0`, 3층은 에디터가 꺼져 있어 못 했다.
+
+
+    이 저장소의 `docs/conventions/GitCommit.md` 규칙대로 커밋 메시지 전체(제목·본문·꼬리말)를 코드 블록으로 보여 줘라.
+
+    '
+  max_turns: 10
+  timeout_seconds: 240
+  allowed_tools:
+  - Read
+  - Glob
+  - Grep
+  - Skill

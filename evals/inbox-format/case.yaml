@@ -1,0 +1,20 @@
+schema_version: '1.0'
+name: inbox-format
+context:
+  scaffold_script: scaffold.sh
+execution:
+  prompt: '너는 감독(사람의 비서)이다. 형이 방금 이렇게 말했다: "고블린 더 빠르게. 3.5로."
+
+    오늘은 2026-09-22 14:05 이다. 고블린 데이터는 `SO_Enemy_Goblin` 의 `m_MoveSpeed` 필드다.
+
+
+    이 저장소의 규칙대로 `docs/feedback/INBOX.md` 에 추가할 줄(정확한 한 줄)과, 그 직후 실행할 git 명령과 커밋 메시지를 보여 줘라. 파일은 쓰지 마라.
+
+    '
+  max_turns: 12
+  timeout_seconds: 300
+  allowed_tools:
+  - Read
+  - Glob
+  - Grep
+  - Skill

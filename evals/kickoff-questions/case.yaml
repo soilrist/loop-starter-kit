@@ -1,0 +1,17 @@
+schema_version: '1.0'
+name: kickoff-questions
+context:
+  scaffold_script: scaffold.sh
+execution:
+  prompt: '형이 말했다: "뱀서라이크 만들자. 쾅냥 서바이버 같은 거, 모바일로."
+
+    너는 감독이다. 이 저장소의 kickoff 절차대로 **사람에게 보낼 질문 묶음만** 작성해서 보여 줘라 (설계서·로드맵 파일은 아직 쓰지 마라). 웹 조사는 못 하는 환경이니 네가 아는 장르 관례로 한다.
+
+    '
+  max_turns: 14
+  timeout_seconds: 420
+  allowed_tools:
+  - Read
+  - Glob
+  - Grep
+  - Skill

@@ -24,7 +24,7 @@ feature/x         ●─●─●                     ← 크거나 위험한 �
 이름은 소문자·하이픈: `feature/combat-resonance`, `fix/ui-tooltip-stuck`.
 
 ## 규칙
-1. **루프는 `develop` 에서만 일한다.** 브랜치를 만들거나 바꾸지 않는다. `loop.sh` 가 바퀴 시작 전에 확인하고, 아니면 멈추고 `logs/alerts.log` 에 `막힘`. 왜: 잘못된 브랜치에 몇십 바퀴 쌓이는 사고 방지.
+1. **루프는 `develop` 에서만 일한다.** 브랜치를 만들거나 바꾸지 않는다. `loop.sh` 가 바퀴 시작 전에 확인하고, 아니면 멈추고 `logs/alerts.log` 에 `막힘`. 왜: 잘못된 브랜치에 몇십 바퀴 쌓이는 사고 방지. 켤 때는 `loop/ctl.sh on` 이 작업 트리가 깨끗하면 `develop` 로 옮겨 주고, 없으면 지금 브랜치에서 만들어 준다 (감독이 손으로 브랜치를 만들 필요 없음).
 2. **`feature/`·`fix/` 는 사람·감독이 루프를 멈춘 상태에서만** 쓴다. 끝나면 `develop` 에 `git merge --no-ff -m "merge: feature/combat-resonance → develop"` 로 합치고 브랜치 삭제.
 3. **`main` 으로 합치기 조건** (감독이 확인, 사람이 승인):
    - 컴파일 에러 0, 테스트 전부 통과, `check_conventions.py` 통과

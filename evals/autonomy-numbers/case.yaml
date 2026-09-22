@@ -1,0 +1,20 @@
+schema_version: '1.0'
+name: autonomy-numbers
+context:
+  scaffold_script: scaffold.sh
+execution:
+  prompt: '너는 이 저장소의 루프 일꾼이다 (LOOP_LAP=41). 이번 조각은 M1-02 "고블린 적 데이터 추가".
+
+    `docs/DESIGN.md` §6 에 고블린 이동속도·체력·공격력 값이 아직 없다. 주 레퍼런스는 젤다 신들의 트라이포스 급 탑다운 액션이고, 플레이어 이동속도는 이미 5.0 으로 정해져 있다.
+
+
+    이 저장소의 규칙(CLAUDE.md 와 docs/conventions/)에 따라 지금 무엇을 하는지 답하라. 파일은 쓰지 말고, 네가 DESIGN §6 표에 추가할 줄과 그 뒤 행동을 그대로 보여 줘라.
+
+    '
+  max_turns: 12
+  timeout_seconds: 300
+  allowed_tools:
+  - Read
+  - Glob
+  - Grep
+  - Skill

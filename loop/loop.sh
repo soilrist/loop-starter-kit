@@ -109,11 +109,12 @@ while :; do
   pre="$(git rev-parse HEAD)"
   started=$(date +%s)
   out="logs/lap-$(printf '%05d' "$lap").log"
+  raw="logs/lap-$(printf '%05d' "$lap").jsonl"   # 도구 호출·결과까지 전부 (감사용) — .log 는 사람이 읽는 요약
   ln -sf "$(basename "$out")" logs/lap-latest.log   # 고정 경로 — 감독·검사 스크립트가 파일 이름을 추측하지 않게
 
   prompt="너는 루프 일꾼이다. 바퀴 번호는 ${lap} 이다. loop/PROMPT.md 를 읽고 그 순서대로 이번 바퀴 하나만 수행하고 끝내라. 커밋 꼬리말 Loop: ${lap} 을 잊지 마라."
 
-  set -- -p "$prompt" --model "$LOOP_MODEL" --output-format text
+  set -- -p "$prompt" --model "$LOOP_MODEL" --output-format stream-json --verbose
   [ -n "${LOOP_FALLBACK_MODEL:-}" ] && set -- "$@" --fallback-model "$LOOP_FALLBACK_MODEL"
   [ -n "${LOOP_MAX_BUDGET_USD:-}" ] && set -- "$@" --max-budget-usd "$LOOP_MAX_BUDGET_USD"
   [ -f "$LOOP_DIR/mcp.json" ] && set -- "$@" --mcp-config "$LOOP_DIR/mcp.json"
@@ -136,12 +137,14 @@ while :; do
       echo "[DRY] $LOOP_CLAUDE_BIN $*" > "$out"
       rc=0
     elif [ "$acct" = "default" ]; then
-      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env -u CLAUDE_CONFIG_DIR "$LOOP_CLAUDE_BIN" "$@" > "$out" 2>&1
+      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env -u CLAUDE_CONFIG_DIR "$LOOP_CLAUDE_BIN" "$@" > "$raw" 2> "$out"
       rc=$?
     else
-      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env CLAUDE_CONFIG_DIR="$acct" "$LOOP_CLAUDE_BIN" "$@" > "$out" 2>&1
+      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env CLAUDE_CONFIG_DIR="$acct" "$LOOP_CLAUDE_BIN" "$@" > "$raw" 2> "$out"
       rc=$?
     fi
+    # 사람이 읽을 요약(.log) = stderr + 최종 답 + 실행한 명령 목록. 한도 문구 판정도 이 파일로.
+    [ "$LOOP_DRY_RUN" = "1" ] || python3 "$LOOP_DIR/lap_audit.py" render "$raw" >> "$out" 2>&1
 
     # 한도 = 한도 문구가 있고 + 실제로 커밋을 하나도 못 남겼을 때 (종료 코드만 믿지 않는다 — 0 으로 끝나며 한도 문구만 남긴 경우가 있었다)
     if [ "$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)" = "0" ] && grep -Eiq "$LIMIT_RE" "$out"; then
@@ -161,6 +164,12 @@ while :; do
   [ $rc -eq 143 ] || [ $rc -eq 137 ] && note="${note} timeout"
   echo "$(date '+%Y-%m-%d %H:%M:%S'),$lap,$used_account,$LOOP_MODEL,$rc,$commits/$work,$secs,$note" >> logs/usage.csv
   log "바퀴 #$lap 끝 — 종료코드 $rc, 커밋 $commits(일 $work), ${secs}초 ${note}"
+
+  # STATUS 에 적힌 "통과(`인용`)" 이 실제 도구 출력에 있었는지 기계로 대조 (Verification.md 1 — jev 가 UNAVAILABLE 이어도 이건 돈다)
+  if [ "$LOOP_DRY_RUN" != "1" ] && [ "$commits" != "0" ]; then
+    audit="$(python3 "$LOOP_DIR/lap_audit.py" check "$raw" "$pre" 2>&1)" || alert "바퀴 #$lap 검사 인용 불일치 — $audit"
+    log "감사: $audit"
+  fi
 
   # 작업 트리에 커밋 안 된 루프 흔적이 남았는지
   # 제외: loop/env.sh(감독 설정) · loop/ logs/ captures/tmp/ 의 추적 안 되는 파일(루프 자신의 상태 파일)

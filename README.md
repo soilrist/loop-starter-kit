@@ -1,4 +1,4 @@
-# 루프 스타터 키트 v2.1.1 (확정)
+# 루프 스타터 키트 v2.2.0 (확정)
 
 **"이거 만들어!" 한마디면 알아서 만들고, 정말 필요할 때만 물어보는 AI 개발팀**을 게임 프로젝트에 심는 키트예요.
 
@@ -23,6 +23,17 @@
 | "커밋 안 된 변경" 경고가 매 바퀴 | 루프 자신의 상태 파일은 제외, 남은 파일 목록을 `alerts.log` 에 같이 기록 |
 | (v2.1.1) 일꾼이 자기 결과를 자기가 채점 | **Jev(TypeSafe) 제3 판정기** `tools/jev.py`: 통과 인용은 `evidence` 가 SUPPORTED 일 때만, 엔진 `Error:` 줄은 `noise` 로 거르고, 결함 지적은 `verdict` CONFIRMED 만 INBOX 로 |
 
+## v2.2 에서 바뀐 것
+| 문제였던 것 | 이제 |
+|---|---|
+| 바퀴 로그에 최종 답만 남아 "명령이 정말 돌았나" 대조 불가 | `loop.sh` 가 도구 호출·출력을 `logs/lap-<n>.jsonl` 로 남기고, 바퀴 끝에 `loop/lap_audit.py check` 가 STATUS 의 모든 `통과(\`인용\`)` 을 실제 출력과 대조 — 지어낸 인용은 `alerts.log` "검사 인용 불일치" |
+| Jev 가 역검증("일부러 깨서 잡혔다") 인용을 항상 NOT_SUPPORTED | `tools/jev.py evidence "<주장>" "<인용>" fail` 세 번째 인자 (Snarehaven 실측 버그) |
+| graphify 규칙이 없는 폴더(`graphify/`)를 가리킴 | `graphify-out/graph.json` 기준으로 통일, 설치 규칙 7-1 에서 그래프 생성, 감독이 마일스톤 끝에 `--update` |
+| `develop` 이 아니면 `ctl.sh on` 이 거부 | 작업 트리가 깨끗하면 `develop` 로 옮기거나 만들어 줌 |
+| 레퍼런스 게임을 모르면 kickoff 가 되물음 | `[!] 사람:` 로드맵 항목 + 장르 관례로 채우고 `〔가정: 레퍼런스 미확인〕` 표시, 다시 묻지 않음 |
+| 스킬이 규칙 원문을 복사해 컨벤션 문서와 어긋남 | 스킬은 절차만, 규칙은 문서 포인터 (`kickoff`·`new-content`) |
+| 키트가 AI 행동을 정말 바꾸는지 잴 방법 없음 | `evals/` 7 케이스 — `claude plugin eval` 로 with/without 비교 (아래 "키트 자체 검사") |
+
 ## 확정된 규칙
 | 항목 | 정한 것 | 이유 |
 |---|---|---|
@@ -43,7 +54,8 @@
 | `.githooks/` | 커밋 메시지 형식·규칙 위반을 **커밋 순간에 막음** |
 | `tools/check_conventions.py` | 이름·엔진별 사이드카 파일·코드 접두어·안 채운 숫자·레퍼런스 시트 유무 자동 검사 (점검한 규칙 목록 출력) |
 | `tools/jev.py` | Jev(TypeSafe System One) 제3 판정기 — `evidence`(통과 인용이 진짜인가) · `noise`(엔진 에러 줄이 잡음인가) · `verdict`(결함 지적이 진짜인가) · `selftest`. 키는 Keychain `typesafe-api-key` 또는 `TYPESAFE_API_KEY` |
-| `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기) |
+| `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기), `lap_audit.py`(바퀴 기록 렌더·STATUS 인용 대조) |
+| `evals/` · `.claude-plugin/` | 키트 자체 시험용 (`claude plugin eval`) — **프로젝트에는 복사하지 않음** |
 | `docs/DESIGN.md` `ROADMAP.md` `STATUS.md` `feedback/INBOX.md` | 기획서·조각 목록·바퀴 기록·우편함 |
 | `docs/templates/` | 기능 명세·버그·결정·사고기록 양식 |
 
@@ -53,7 +65,7 @@
 압축을 풀어 둔 뒤, **프로젝트 폴더를 연 Code 탭 세션**에 아래를 그대로 붙여넣으세요.
 
 ```
-루프 스타터 키트 v2.1.1 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
+루프 스타터 키트 v2.2.0 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
 키트의 README.md "설치 규칙"을 먼저 읽고 그대로 따라 줘.
 끝나면 결과를 5줄로 보고하고, 내가 정해야 할 것만 모아서 물어봐.
 루프는 아직 켜지 마.
@@ -69,7 +81,7 @@
    - 이미 있는 파일은 차이를 보여 주고 합칠 방법을 제안한다. 사람 승인 후에만 합친다.
    - 옛 루프 파일(`loop/`)이 있으면 `loop/_v1_backup/` 으로 옮긴 뒤 새 파일을 넣는다. 지우지 않는다.
 3. **복사**
-   - 키트 파일을 복사하되 `README.md` 는 `docs/LOOP_KIT_README.md` 로 넣는다.
+   - 키트 파일을 복사하되 `README.md` 는 `docs/LOOP_KIT_README.md` 로 넣는다. `evals/`·`.claude-plugin/` 은 키트 자체 시험용 — 복사하지 않는다.
    - 실행 권한: `chmod +x loop/*.sh .githooks/*`
 4. **이름 맞추기**
    - `loop/env.sh` 의 `LOOP_SLUG` 를 프로젝트 이름(영어 소문자·하이픈, 예 `joseon-sword`)으로 바꾼다.
@@ -89,13 +101,14 @@
 7. **검사**
    - `python3 tools/check_conventions.py` 를 돌린다 (엔진 프로젝트가 하위 폴더면 `--root <폴더>`).
    - 기존 파일의 위반은 **지금 고치지 않는다.** 목록만 보여 주고, ROADMAP 맨 앞에 `M0-00 기존 파일 규칙 맞추기` 조각으로 넣는다. 파일 이동은 루프가 에디터·엔진 MCP 로 한다.
+   - 7-1. **코드 그래프**: `command -v graphify` 가 있으면 `/graphify .` 로 `graphify-out/` 을 만들고 `.gitignore` 에 `/graphify-out/` 을 넣는다 (그래프는 커밋하지 않음). 없으면 이 단계는 건너뛰고 보고에 한 줄 적는다 — 루프는 그래프가 있을 때만 `graphify query` 를 쓴다. 갱신은 감독이 마일스톤 끝에 `/graphify . --update`.
 8. **루프 시험**
    - `loop/ctl.sh try` 로 claude 를 부르지 않는 시험 두 바퀴를 돌린다 (번호는 `logs/lap.dry` 에 따로 셈).
    - `logs/usage.csv` 에 `dry` 두 줄이 생겼는지 확인한다.
    - `command -v claude` 와 `~/.claude-loop-nc` 폴더가 있는지 확인해 보고한다.
    - `python3 tools/jev.py selftest` 가 `SELFTEST_OK` 인지 확인한다. `UNAVAILABLE` 이면 키·SDK(`~/.claude/scripts/.venv`) 문제 — 고치지 말고 보고만 (루프는 `통과(jev 미확인)` 로 돌 수 있음).
 9. **커밋**
-   - `chore(loop): 루프 스타터 키트 v2.1.1 설치` 로 커밋한다 (훅 통과 확인).
+   - `chore(loop): 루프 스타터 키트 v2.2.0 설치` 로 커밋한다 (훅 통과 확인).
    - 사람이 확인한 뒤에만 커밋한다.
 10. **보고**: 설치된 것 / 합친 파일 / 기존 위반 수 / 사람이 정할 것.
 
@@ -110,6 +123,15 @@
 | **"고블린 더 빠르게"** | 비서가 바로 루프에게 지시. 루프가 값을 정해 `DESIGN.md` §6 에 근거와 함께 적음 |
 | **"알아서 해"** | 비서 추천대로 진행하고 결정을 기록 |
 | **"꺼"** | 하던 조각 마무리하고 멈춤 |
+
+## 키트 자체 검사 (키트를 고친 사람이 돌리는 것)
+`evals/` 의 7 케이스는 "규칙 문서·스킬이 있을 때 vs 없을 때" AI 답이 달라지는지를 `claude plugin eval` 로 잰다 (숫자 되묻기, 신호등, 커밋 형식, 검사기 보고, INBOX 형식, kickoff 질문, 검사 정직성). 키트 루트에서:
+
+```bash
+env ANTHROPIC_BASE_URL=https://api.anthropic.com ANTHROPIC_AUTH_TOKEN= ANTHROPIC_MODEL= ANTHROPIC_DEFAULT_OPUS_MODEL= ANTHROPIC_DEFAULT_SONNET_MODEL= ANTHROPIC_DEFAULT_HAIKU_MODEL= claude plugin eval . --scaffold --no-publish --trust-plugin --judge-model sonnet --runs 2 --ablation with-without
+```
+
+앞의 `env …=` 는 settings.json 이 옴니라우터 별칭을 가리킬 때 공식 API 로 되돌리는 것 — 그대로 두면 판정 모델을 못 찾아 실패한다. 결과는 `evals/results/` (커밋 안 함). 기준: with 점수가 without 보다 높아야 하고, 떨어진 케이스는 그 규칙 문서를 고친 뒤 다시 잰다.
 
 ## 출처
 - Unity `.gitignore`: github/gitignore
