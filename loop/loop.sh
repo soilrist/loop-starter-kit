@@ -29,7 +29,11 @@ alert() {
   fi
 }
 
-[ -f logs/usage.csv ] || echo "time,lap,account,model,exit,commits,seconds,note" > logs/usage.csv
+# v2.3: 바퀴마다 노력 단계·턴·토큰·추정비용 칸이 붙는다. 옛 머리줄 파일은 이름을 바꿔 보관하고 새로 시작 (칸이 어긋나지 않게)
+if [ -f logs/usage.csv ] && ! head -n 1 logs/usage.csv | grep -q ',turns,'; then
+  mv logs/usage.csv logs/usage-pre23.csv || exit 1
+fi
+[ -f logs/usage.csv ] || echo "time,lap,account,model,exit,commits,seconds,note,effort,turns,in_tok,out_tok,cache_read,cost_usd" > logs/usage.csv
 LAP_FILE="logs/lap"
 [ "${LOOP_DRY_RUN:-0}" = "1" ] && LAP_FILE="logs/lap.dry"   # 시험 바퀴는 번호를 따로 셈
 [ -f "$LAP_FILE" ] || echo 0 > "$LAP_FILE"
@@ -114,7 +118,13 @@ while :; do
 
   prompt="너는 루프 일꾼이다. 바퀴 번호는 ${lap} 이다. loop/PROMPT.md 를 읽고 그 순서대로 이번 바퀴 하나만 수행하고 끝내라. 커밋 꼬리말 Loop: ${lap} 을 잊지 마라."
 
+  # 노력 단계: 평소엔 LOOP_EFFORT, 직전 바퀴가 일한 커밋 없이 끝났으면(실패·헛바퀴) LOOP_EFFORT_RETRY 로 한 단계 올린다
+  # 왜: 높은 단계는 토큰을 더 쓰지만 재시도 한 번을 줄이면 본전 — 그래서 막혔을 때만 올린다
+  effort="${LOOP_EFFORT:-}"
+  [ "$idle" -ge 1 ] && [ -n "${LOOP_EFFORT_RETRY:-}" ] && effort="$LOOP_EFFORT_RETRY"
+
   set -- -p "$prompt" --model "$LOOP_MODEL" --output-format stream-json --verbose
+  [ -n "$effort" ] && set -- "$@" --effort "$effort"
   [ -n "${LOOP_FALLBACK_MODEL:-}" ] && set -- "$@" --fallback-model "$LOOP_FALLBACK_MODEL"
   [ -n "${LOOP_MAX_BUDGET_USD:-}" ] && set -- "$@" --max-budget-usd "$LOOP_MAX_BUDGET_USD"
   [ -f "$LOOP_DIR/mcp.json" ] && set -- "$@" --mcp-config "$LOOP_DIR/mcp.json"
@@ -125,7 +135,7 @@ while :; do
   rc=0
   note=""
   all_limited=1
-  log "바퀴 #$lap 시작 (모델 $LOOP_MODEL)"
+  log "바퀴 #$lap 시작 (모델 $LOOP_MODEL, 노력 ${effort:-기본})"
 
   for acct in $LOOP_ACCOUNTS; do
     if [ "$acct" != "default" ] && [ ! -d "$acct" ]; then
@@ -162,8 +172,18 @@ while :; do
   work="$(git log --format=%s "$pre..HEAD" 2>/dev/null | grep -vc '^docs(status)' || true)"
   work="${work:-0}"
   [ $rc -eq 143 ] || [ $rc -eq 137 ] && note="${note} timeout"
-  echo "$(date '+%Y-%m-%d %H:%M:%S'),$lap,$used_account,$LOOP_MODEL,$rc,$commits/$work,$secs,$note" >> logs/usage.csv
+  # 턴·토큰·추정비용 (기록의 마지막 result 줄에서). 시험 바퀴·기록 없음이면 빈 칸
+  spent=",,,,"
+  if [ "$LOOP_DRY_RUN" != "1" ] && [ -f "$raw" ]; then
+    spent="$(python3 "$LOOP_DIR/lap_audit.py" usage "$raw" 2>/dev/null)"
+    [ -n "$spent" ] || spent=",,,,"
+  fi
+  echo "$(date '+%Y-%m-%d %H:%M:%S'),$lap,$used_account,$LOOP_MODEL,$rc,$commits/$work,$secs,$note,$effort,$spent" >> logs/usage.csv
   log "바퀴 #$lap 끝 — 종료코드 $rc, 커밋 $commits(일 $work), ${secs}초 ${note}"
+  # 옛 claude 가 --effort 를 모르면 매 바퀴가 시작도 못 하고 끝난다 — 원인을 바로 알려 준다
+  if [ "$LOOP_DRY_RUN" != "1" ] && grep -q "unknown option '--effort'" "$out" 2>/dev/null; then
+    alert "claude 가 --effort 옵션을 모름 — claude 를 업데이트하거나 loop/env.sh 의 LOOP_EFFORT·LOOP_EFFORT_RETRY 를 비울 것"
+  fi
 
   # STATUS 에 적힌 "통과(`인용`)" 이 실제 도구 출력에 있었는지 기계로 대조 (Verification.md 1 — jev 가 UNAVAILABLE 이어도 이건 돈다)
   if [ "$LOOP_DRY_RUN" != "1" ] && [ "$commits" != "0" ]; then

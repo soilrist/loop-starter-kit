@@ -18,6 +18,12 @@ LOOP_LAP_TIMEOUT_SEC=2400
 LOOP_MODEL="sonnet"
 LOOP_FALLBACK_MODEL="opus"
 
+# 노력 단계 (claude --effort): low / medium / high / xhigh / max. 비우면 claude 기본값
+# 평소엔 medium, 직전 바퀴가 일한 커밋 없이 끝났을 때만 RETRY 값으로 올린다 (비우면 안 올림)
+# 왜: 단계가 높을수록 토큰을 더 쓴다. 높은 단계는 "재시도 한 번을 줄여 줄 때"만 본전이다
+LOOP_EFFORT="medium"
+LOOP_EFFORT_RETRY="high"
+
 # 한 바퀴 비용 상한(달러, 비우면 제한 없음) — claude --max-budget-usd
 LOOP_MAX_BUDGET_USD=""
 
