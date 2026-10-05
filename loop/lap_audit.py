@@ -8,12 +8,15 @@
                                 기록이 없으면 빈 칸 `,,,,` — 항상 종료코드 0
   report [usage.csv] [바퀴수]   최근 바퀴(기본 20)의 "일한 바퀴 하나당" 턴·토큰·추정비용, 헛바퀴가 쓴 몫,
                                 모델·노력 단계별 비교를 사람이 읽을 글로 출력 (`loop/ctl.sh cost`)
+  context <lap.jsonl>           이번 바퀴에서 모델이 호출마다 받은 컨텍스트 한 줄: `첫호출,최대,호출수,입력합,출력합`
+                                (loop.sh 가 logs/context.csv 에 붙임 — 가벼운 바퀴가 실제로 줄였는지 재는 숫자)
+  ctxreport [context.csv] [바퀴수]  최근 바퀴의 시작·최대 컨텍스트 평균 한 줄 (`loop/ctl.sh cost` 끝에 붙음)
   size   [루트]                 매 바퀴 다시 읽히는 문서가 불었는지: STATUS "지금 상태" 줄 수 · STATUS 전체 줄 수 ·
                                 INBOX 글자 수와 종류별 개수. 한도를 넘으면 사유를 출력하고 종료코드 1
   tidy   [루트] [--dry]         STATUS 의 오래된 바퀴 기록과 "지금 상태"에서 넘친 항목을 docs/archive/ 로 옮김
                                 (글자 하나도 버리지 않음 · 커밋은 감독이 — `loop/ctl.sh tidy`)
   statelines                    표준입력으로 받은 STATUS 의 "지금 상태" 줄 수 (커밋 훅이 씀)
-  selftest                      내장 자료로 render/check/usage/report/size/tidy 동작 확인 (SELFTEST_OK)
+  selftest                      내장 자료로 render/check/usage/context/report/size/tidy 동작 확인 (SELFTEST_OK)
 
 왜: `--output-format text` 로는 최종 답만 남아 "정말 명령을 돌렸나"를 아무도 대조할 수 없었다.
 stream-json 을 남기면 도구 호출·결과가 전부 있으니 인용을 기계로 대조한다 (Verification.md 1).
@@ -327,6 +330,57 @@ def usage(path):
     print(",".join(fields))
 
 
+def context_fields(events):
+    """호출마다 모델이 받은 컨텍스트(입력+캐시) — 같은 message.id 는 한 번만 센다 (한 호출이 여러 줄로 나뉘어 기록된다)"""
+    seen, sizes, out = set(), [], 0
+    for ev in events:
+        m = ev.get("message") or {}
+        u, mid = m.get("usage"), m.get("id")
+        if ev.get("type") != "assistant" or not u or mid in seen:
+            continue
+        seen.add(mid)
+        sizes.append(u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0) + u.get("cache_creation_input_tokens", 0))
+        out += u.get("output_tokens", 0)
+    if not sizes:
+        return "0,0,0,0,0"
+    return f"{sizes[0]},{max(sizes)},{len(sizes)},{sum(sizes)},{out}"
+
+
+def context(path):
+    try:
+        print(context_fields(_events(path)))
+    except OSError:
+        print("0,0,0,0,0")
+
+
+def ctxreport_line(rows, last_n=20):
+    """context.csv 줄들 → 최근 바퀴의 시작·최대 컨텍스트 평균 한 줄. 잰 바퀴가 없으면 빈 문자열."""
+    vals = []
+    for r in rows[-last_n:]:
+        try:
+            first, peak, calls = int(r.get("first") or 0), int(r.get("peak") or 0), int(r.get("calls") or 0)
+        except ValueError:
+            continue
+        if calls > 0:
+            vals.append((first, peak, calls))
+    if not vals:
+        return ""
+    n = len(vals)
+    return (f"컨텍스트 (최근 {n}바퀴 평균): 바퀴 시작 {sum(v[0] for v in vals) / n / 1000:.1f}K · "
+            f"최대 {sum(v[1] for v in vals) / n / 1000:.1f}K · 호출 {sum(v[2] for v in vals) / n:.0f}번")
+
+
+def ctxreport(path="logs/context.csv", last_n=20):
+    try:
+        with open(path, encoding="utf-8", errors="replace", newline="") as f:
+            line = ctxreport_line(list(csv.DictReader(f)), last_n)
+    except OSError:
+        return 0
+    if line:
+        print(line)
+    return 0
+
+
 def _f(row, key):
     try:
         return float(row.get(key) or "")
@@ -449,6 +503,12 @@ def selftest():
     bad = ["검사: 1층 통과(`✔ 규칙 검사 통과 (경고 1)`)"]
     assert check_quotes(ok, out) == [], "일치하는 인용을 놓침"
     assert check_quotes(bad, out) == ["✔ 규칙 검사 통과 (경고 1)"], "없는 인용을 통과시킴"
+    ev = lambda i, c: {"type": "assistant", "message": {"id": i, "usage": {"input_tokens": 1, "cache_read_input_tokens": c, "output_tokens": 5}}}
+    assert context_fields([ev("a", 99), ev("a", 99), ev("b", 199)]) == "100,200,2,300,10", "같은 id 두 줄은 한 번만 세야 함"
+    assert context_fields([{"type": "result"}]) == "0,0,0,0,0", "호출 없는 기록"
+    ctx = ctxreport_line([{"first": "20000", "peak": "90000", "calls": "30"}, {"first": "0", "peak": "0", "calls": "0"}, {"first": "30000", "peak": "110000", "calls": "50"}])
+    assert "바퀴 시작 25.0K" in ctx and "최대 100.0K" in ctx and "최근 2바퀴" in ctx, ctx
+    assert ctxreport_line([{"first": "0", "peak": "0", "calls": "0"}]) == "", "잰 바퀴가 없는데 줄을 냄"
     assert check_quotes(["검사: 3층 못 함(에디터 꺼짐)"], "") == [], "인용 없는 줄을 지적함"
     assert _content_text([{"type": "text", "text": "a"}, {"type": "text", "text": "b"}]) == "a\nb"
     print("SELFTEST_OK")
@@ -462,6 +522,10 @@ if __name__ == "__main__":
         sys.exit(check(a[1], a[2]))
     elif a[:1] == ["usage"] and len(a) == 2:
         usage(a[1])
+    elif a[:1] == ["context"] and len(a) == 2:
+        context(a[1])
+    elif a[:1] == ["ctxreport"] and len(a) <= 3:
+        sys.exit(ctxreport(a[1] if len(a) > 1 else "logs/context.csv", int(a[2]) if len(a) > 2 and a[2].isdigit() else 20))
     elif a[:1] == ["report"] and len(a) <= 3:
         sys.exit(report(a[1] if len(a) > 1 else "logs/usage.csv", int(a[2]) if len(a) > 2 and a[2].isdigit() else 20))
     elif a[:1] == ["size"] and len(a) <= 2:

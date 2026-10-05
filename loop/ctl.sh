@@ -98,13 +98,15 @@ case "${1:-status}" in
     echo "실행 중   : ${pid:-아니오}"
     echo "STOP/WRAPUP: $( [ -f "$LOOP_DIR/STOP" ] && echo STOP ) $( [ -f "$LOOP_DIR/WRAPUP" ] && echo WRAPUP )"
     echo "마지막 바퀴: $(cat logs/lap 2>/dev/null || echo 0)"
-    echo "설정      : 모델 $LOOP_MODEL / 노력 ${LOOP_EFFORT:-기본}(막히면 ${LOOP_EFFORT_RETRY:-그대로}) / 쉬는 시간 ${LOOP_SLEEP_SEC}초 / 계정 $LOOP_ACCOUNTS"
+    echo "설정      : 모델 $LOOP_MODEL / 노력 ${LOOP_EFFORT:-기본}(막히면 ${LOOP_EFFORT_RETRY:-그대로}) / 쉬는 시간 ${LOOP_SLEEP_SEC}초 / 계정 $LOOP_ACCOUNTS / 가벼운 바퀴 $([ "${LOOP_LEAN:-1}" = "1" ] && echo 켬 || echo 끔)"
     echo "--- 최근 바퀴"; tail -n 5 logs/usage.csv 2>/dev/null || echo "(없음)"
     echo "--- 경고";     tail -n 5 logs/alerts.log 2>/dev/null || echo "(없음)"
     ;;
   cost)
     cd "$ROOT" || exit 1
-    python3 "$LOOP_DIR/lap_audit.py" report logs/usage.csv "${2:-20}"
+    python3 "$LOOP_DIR/lap_audit.py" report logs/usage.csv "${2:-20}"; rc=$?
+    python3 "$LOOP_DIR/lap_audit.py" ctxreport logs/context.csv "${2:-20}"
+    exit $rc
     ;;
   size)
     cd "$ROOT" || exit 1
