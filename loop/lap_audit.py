@@ -8,7 +8,12 @@
                                 기록이 없으면 빈 칸 `,,,,` — 항상 종료코드 0
   report [usage.csv] [바퀴수]   최근 바퀴(기본 20)의 "일한 바퀴 하나당" 턴·토큰·추정비용, 헛바퀴가 쓴 몫,
                                 모델·노력 단계별 비교를 사람이 읽을 글로 출력 (`loop/ctl.sh cost`)
-  selftest                      내장 자료로 render/check/usage/report 동작 확인 (SELFTEST_OK)
+  size   [루트]                 매 바퀴 다시 읽히는 문서가 불었는지: STATUS "지금 상태" 줄 수 · STATUS 전체 줄 수 ·
+                                INBOX 글자 수와 종류별 개수. 한도를 넘으면 사유를 출력하고 종료코드 1
+  tidy   [루트] [--dry]         STATUS 의 오래된 바퀴 기록과 "지금 상태"에서 넘친 항목을 docs/archive/ 로 옮김
+                                (글자 하나도 버리지 않음 · 커밋은 감독이 — `loop/ctl.sh tidy`)
+  statelines                    표준입력으로 받은 STATUS 의 "지금 상태" 줄 수 (커밋 훅이 씀)
+  selftest                      내장 자료로 render/check/usage/report/size/tidy 동작 확인 (SELFTEST_OK)
 
 왜: `--output-format text` 로는 최종 답만 남아 "정말 명령을 돌렸나"를 아무도 대조할 수 없었다.
 stream-json 을 남기면 도구 호출·결과가 전부 있으니 인용을 기계로 대조한다 (Verification.md 1).
@@ -16,13 +21,28 @@ stream-json 을 남기면 도구 호출·결과가 전부 있으니 인용을 �
 추정비용은 API 값으로 환산한 것이라 구독 계정의 실제 청구액이 아니다. 전후 비교용으로만 쓴다.
 """
 import csv
+import datetime
 import json
+import os
 import re
 import subprocess
 import sys
 
 PASS_RE = re.compile(r"통과\(`([^`]+)`\)")
+EYE_PASS_RE = re.compile(r"3층\s*통과")
+IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp")
 USAGE_COLS = ("turns", "in_tok", "out_tok", "cache_read", "cost_usd")
+
+# 매 바퀴 다시 읽히는 문서의 한도 — 넘으면 size 가 경고, 커밋 훅은 NOW_HARD 에서 거절
+NOW_KEEP = 15          # "지금 상태" 권장 줄 수 (tidy 가 이만큼만 남김)
+NOW_WARN = 20          # 넘으면 경고
+NOW_HARD = 25          # 루프 커밋 훅이 거절하는 줄 수
+STATUS_MAX_LINES = 1200
+LAPS_KEEP = 30         # tidy 가 STATUS 에 남기는 최근 바퀴 수
+INBOX_MAX_CHARS = 12000
+HUMAN_KINDS = ("확인", "질문", "승인")   # 루프가 처리하지 않는 종류 — 쌓이면 읽는 값만 든다
+LAP_HEAD_RE = re.compile(r"^## #", re.M)   # `## #0412 …` 일꾼 바퀴, `## #감독 …` 감독이 직접 한 일
+NOW_HEAD = "## 지금 상태"
 
 
 def _events(path):
@@ -96,6 +116,32 @@ def check_quotes(lines, tool_output):
     return missing
 
 
+def saw_image(events):
+    """이번 바퀴에 그림을 실제로 열어 봤나 — Read 로 그림 파일을 열었거나, 도구 결과에 그림이 들어 있었나"""
+    for ev in events:
+        t = ev.get("type")
+        content = (ev.get("message") or {}).get("content")
+        if not isinstance(content, list):
+            continue
+        for b in content:
+            if not isinstance(b, dict):
+                continue
+            if t == "assistant" and b.get("type") == "tool_use":
+                fp = str((b.get("input") or {}).get("file_path") or "").lower()
+                if b.get("name") == "Read" and fp.endswith(IMAGE_EXT):
+                    return True
+            elif t == "user" and b.get("type") == "tool_result":
+                inner = b.get("content")
+                if isinstance(inner, list) and any(isinstance(x, dict) and x.get("type") == "image" for x in inner):
+                    return True
+    return False
+
+
+def eye_claim_without_look(lines, looked):
+    """STATUS 에 새로 "3층 통과" 를 적었는데 이번 바퀴에 그림을 하나도 안 열었으면 True"""
+    return (not looked) and any(EYE_PASS_RE.search(l) for l in lines)
+
+
 def check(path, pre_sha):
     _, cmds, out = parse(path)
     lines = status_added_lines(pre_sha)
@@ -107,7 +153,145 @@ def check(path, pre_sha):
     if missing:
         print("STATUS 의 통과 인용이 실제 도구 출력에 없음: " + " | ".join(m[:60] for m in missing))
         return 1
+    if eye_claim_without_look(lines, saw_image(_events(path))):
+        print("STATUS 에 '3층 통과' 라 적었는데 이번 바퀴에 캡처를 하나도 열어 보지 않음 (눈 검사는 그림을 실제로 열었을 때만 통과)")
+        return 1
     print(f"인용 {quotes}개 전부 도구 출력과 일치")
+    return 0
+
+
+# ── 문서 살림: 매 바퀴 다시 읽히는 STATUS·INBOX 가 불지 않게 ─────────────────────────
+
+def split_status(text):
+    """STATUS → (머리말, 지금 상태 본문 줄들, [바퀴 덩어리]). 지금 상태 절이 없으면 본문은 빈 목록."""
+    m = LAP_HEAD_RE.search(text)
+    top, laps_text = (text[:m.start()], text[m.start():]) if m else (text, "")
+    laps = [b for b in re.split(r"(?m)^(?=## #)", laps_text) if b.strip()]
+    i = top.find(NOW_HEAD)
+    if i < 0:
+        return top, [], laps
+    head_end = top.find("\n", i) + 1 or len(top)
+    return top[:head_end], top[head_end:].splitlines(), laps
+
+
+def now_line_count(now_lines):
+    return sum(1 for l in now_lines if l.strip() and l.strip() != "---")
+
+
+def split_now(now_lines, keep=NOW_KEEP):
+    """지금 상태 본문을 최상위 항목(`- `) 단위로 잘라 앞쪽 keep 줄만 남긴다 → (남길 줄, 넘친 줄). 항목을 중간에서 자르지 않는다."""
+    items, cur = [], []
+    for l in now_lines:
+        if l.startswith("- ") and cur:
+            items.append(cur)
+            cur = []
+        cur.append(l)
+    if cur:
+        items.append(cur)
+    kept, over, used = [], [], 0
+    for idx, it in enumerate(items):
+        n = now_line_count(it)
+        if not over and (idx == 0 or used + n <= keep):
+            kept.extend(it)
+            used += n
+        else:
+            over.extend(l for l in it if l.strip() != "---")
+    return kept, over
+
+
+def inbox_stats(text):
+    kinds = {}
+    for l in text.splitlines():
+        m = re.match(r"- \[.\] ([^(（\s]+)", l)
+        if m:
+            kinds[m.group(1)] = kinds.get(m.group(1), 0) + 1
+    human = sum(n for k, n in kinds.items() if k in HUMAN_KINDS)
+    standing = sum(1 for l in text.splitlines() if l.startswith("- [") and "상시" in l)
+    return kinds, human, standing
+
+
+def size_problems(status_text, inbox_text):
+    _, now, laps = split_status(status_text)
+    probs = []
+    n = now_line_count(now)
+    if n > NOW_WARN:
+        probs.append(f'STATUS "지금 상태" {n}줄 (권장 {NOW_KEEP}줄 이내) — 일꾼이 매 바퀴 읽는다')
+    total = status_text.count("\n")
+    if total > STATUS_MAX_LINES:
+        probs.append(f"STATUS {total}줄 · 바퀴 기록 {len(laps)}개 (한도 {STATUS_MAX_LINES}줄)")
+    kinds, human, standing = inbox_stats(inbox_text)
+    if len(inbox_text) > INBOX_MAX_CHARS:
+        detail = " · ".join(f"{k} {v}" for k, v in sorted(kinds.items(), key=lambda kv: -kv[1]))
+        probs.append(f"INBOX {len(inbox_text):,}글자 (한도 {INBOX_MAX_CHARS:,}) — {detail}")
+    if human > 10:
+        probs.append(f"INBOX 에 사람·감독이 닫아야 할 확인·질문·승인 {human}개가 쌓임")
+    if standing:
+        probs.append(f"INBOX 에 '상시' 규칙 {standing}줄 — INBOX 는 끝나면 지우는 우편함, 상시 규칙은 CLAUDE.md 로")
+    return probs
+
+
+def _read(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def size(root="."):
+    probs = size_problems(_read(os.path.join(root, "docs/STATUS.md")), _read(os.path.join(root, "docs/feedback/INBOX.md")))
+    if probs:
+        print(" / ".join(probs) + " → 감독이 정리 (DIRECTOR.md 문서 살림)")
+        return 1
+    print("문서 크기 정상")
+    return 0
+
+
+def tidy_plan(status_text, keep_laps=LAPS_KEEP, keep_now=NOW_KEEP):
+    """→ (새 STATUS, 보관 파일에 덧붙일 글, 옮긴 바퀴 수, 옮긴 지금-상태 줄 수)"""
+    head, now, laps = split_status(status_text)
+    kept_now, over_now = split_now(now, keep_now) if now_line_count(now) > keep_now else (now, [])
+    old_laps = laps[keep_laps:]
+    body = "\n".join(l for l in kept_now if l.strip() != "---").rstrip("\n")
+    new_status = head + (body + "\n" if body else "")
+    if laps:
+        new_status = new_status.rstrip("\n") + "\n\n---\n\n" + "".join(laps[:keep_laps])
+    today = datetime.date.today().isoformat()
+    archive = ""
+    if over_now:
+        archive += f"## 지금 상태에서 넘친 것 ({today} 정리)\n" + "\n".join(over_now).rstrip("\n") + "\n\n"
+    archive += "".join(old_laps)
+    return new_status, archive, len(old_laps), now_line_count(over_now)
+
+
+def tidy(root=".", dry=False):
+    sp = os.path.join(root, "docs/STATUS.md")
+    text = _read(sp)
+    if not text:
+        print("docs/STATUS.md 를 못 읽음")
+        return 1
+    new_status, archive, n_laps, n_now = tidy_plan(text)
+    if not archive.strip():
+        print("옮길 것 없음 (바퀴 기록·지금 상태 모두 한도 안)")
+        return 0
+    ap = os.path.join(root, "docs/archive", f"STATUS-{datetime.date.today().isoformat()}.md")
+    # 한 글자도 버리지 않았는지: 옮긴 줄이 전부 새 STATUS 나 보관 글에 있어야 한다
+    after = set(new_status.splitlines()) | set(archive.splitlines())
+    lost = [l for l in text.splitlines() if l.strip() and l.strip() != "---" and l not in after]
+    if lost:
+        print(f"중단: 정리하면 {len(lost)}줄이 사라짐 (첫 줄: {lost[0][:60]}) — 아무것도 바꾸지 않음")
+        return 1
+    print(f"바퀴 기록 {n_laps}개 · 지금 상태 {n_now}줄 → {os.path.relpath(ap, root)} "
+          f"(STATUS {text.count(chr(10))}줄 → {new_status.count(chr(10))}줄)")
+    if dry:
+        print("(--dry: 파일은 바꾸지 않음)")
+        return 0
+    os.makedirs(os.path.dirname(ap), exist_ok=True)
+    with open(ap, "a", encoding="utf-8") as f:
+        f.write(archive if archive.endswith("\n") else archive + "\n")
+    with open(sp, "w", encoding="utf-8") as f:
+        f.write(new_status)
+    print(f"다음: git add docs/STATUS.md {os.path.relpath(ap, root)} → 커밋 `docs(status): 오래된 기록 보관`")
     return 0
 
 
@@ -231,6 +415,35 @@ def selftest():
     assert "턴 20.0" in rep and "$1.00" in rep, rep
     assert "$3.00 / $4.00 (75%)" in rep, rep
     assert report_lines([{"account": "dry"}]) == ["기록된 바퀴가 없음"]
+    # 눈 검사: 그림을 안 열고 "3층 통과" 라 쓰면 잡는다
+    read_img = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "captures/0007_ui_inventory.PNG"}}]}}]
+    tool_img = [{"type": "user", "message": {"content": [{"type": "tool_result", "content": [{"type": "image", "source": {}}]}]}}]
+    read_txt = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "docs/STATUS.md"}}]}}]
+    assert saw_image(read_img) and saw_image(tool_img) and not saw_image(read_txt), "그림을 열었는지 판정이 틀림"
+    assert eye_claim_without_look(["검사: 1층 통과 / 3층 통과(레퍼런스 대조: docs/reference/inv.md)"], False)
+    assert not eye_claim_without_look(["검사: 1층 통과 / 3층 통과(레퍼런스 대조: docs/reference/inv.md)"], True)
+    assert not eye_claim_without_look(["검사: 1층 통과 / 3층 못 함(에디터 꺼짐)"], False), "못 함을 지적함"
+    # 문서 살림: 넘친 것만 옮기고 한 줄도 버리지 않는다
+    st = "# STATUS\n> 머리말\n\n## 지금 상태 (루프가 매 바퀴 갱신)\n" + "".join(f"- 항목 {i}\n  덧붙인 줄 {i}\n" for i in range(1, 21)) \
+        + "\n---\n\n" + "".join(f"## #{n:04d} · 조각 M0-{n}\n- 한 것: {n}\n\n" for n in range(40, 0, -1))
+    head, now, laps = split_status(st)
+    assert now_line_count(now) == 40 and len(laps) == 40, (now_line_count(now), len(laps))
+    new, arch, n_laps, n_now = tidy_plan(st)
+    h2, now2, laps2 = split_status(new)
+    assert n_laps == 10 and len(laps2) == 30 and laps2[0].startswith("## #0040"), (n_laps, len(laps2))
+    assert now_line_count(now2) == 14 and n_now == 26, (now_line_count(now2), n_now)
+    assert "- 항목 7\n" in new and "- 항목 8\n" in arch and "## #0010" in arch and "## #0011" in new
+    both = set(new.splitlines()) | set(arch.splitlines())
+    assert all(l in both for l in st.splitlines() if l.strip() and l.strip() != "---"), "정리하다 줄을 잃음"
+    assert tidy_plan(new)[1].strip() == "", "한도 안인데 또 옮기려 함"
+    one = "## 지금 상태\n- " + "\n  ".join(f"긴 항목의 줄 {i}" for i in range(30)) + "\n- 둘째\n"
+    kept, over = split_now(split_status(one)[1])
+    assert len(kept) == 30 and over == ["- 둘째"], "첫 항목은 길어도 통째로 남겨야 함"
+    inbox = "# INBOX\n" + "".join(f"- [ ] 확인(루프#{i}, 2026-09-18 10:00) **가정 {i}.** 본문\n" for i in range(12)) \
+        + "- [ ] 지시(감독←형 상시 규칙, 2026-09-21 00:00) **검증 확실히.** 삭제: 하지 않음\n"
+    probs = " / ".join(size_problems(st, inbox))
+    assert "지금 상태" in probs and "40줄" in probs and "확인·질문·승인 12개" in probs and "상시" in probs, probs
+    assert size_problems(new, "# INBOX\n- [ ] 지시(감독, 2026-09-21 00:00) **고블린 속도 3.5.**\n") == [], size_problems(new, "")
     out = "✔ 규칙 검사 통과 (경고 0 / 미정 숫자 0)\nPassed: 3, Failed: 0"
     ok = ["검사: 1층 통과(`✔ 규칙 검사 통과 (경고 0 / 미정 숫자 0)`) / 2층 통과(`Passed: 3, Failed: 0`)"]
     bad = ["검사: 1층 통과(`✔ 규칙 검사 통과 (경고 1)`)"]
@@ -251,6 +464,13 @@ if __name__ == "__main__":
         usage(a[1])
     elif a[:1] == ["report"] and len(a) <= 3:
         sys.exit(report(a[1] if len(a) > 1 else "logs/usage.csv", int(a[2]) if len(a) > 2 and a[2].isdigit() else 20))
+    elif a[:1] == ["size"] and len(a) <= 2:
+        sys.exit(size(a[1] if len(a) > 1 else "."))
+    elif a[:1] == ["tidy"] and len(a) <= 3:
+        rest = [x for x in a[1:] if x != "--dry"]
+        sys.exit(tidy(rest[0] if rest else ".", dry="--dry" in a))
+    elif a[:1] == ["statelines"]:
+        print(now_line_count(split_status(sys.stdin.read())[1]))
     elif a[:1] == ["selftest"]:
         selftest()
     else:

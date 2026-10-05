@@ -7,6 +7,8 @@
 #   kill    지금 즉시 강제 종료 + launchd 해제
 #   status  상태 보기
 #   cost    최근 20바퀴의 "일한 바퀴 하나당" 턴·토큰·추정비용 (cost 50 처럼 바퀴 수 지정 가능)
+#   size    매 바퀴 다시 읽히는 문서(STATUS "지금 상태"·INBOX)가 한도를 넘었는지
+#   tidy    STATUS 의 오래된 기록을 docs/archive/ 로 옮김 (tidy --dry 는 미리 보기)
 #   try     시험 두 바퀴 (claude 안 부름, 설치 확인용)
 # ─────────────────────────────────────────────
 set -u
@@ -104,9 +106,22 @@ case "${1:-status}" in
     cd "$ROOT" || exit 1
     python3 "$LOOP_DIR/lap_audit.py" report logs/usage.csv "${2:-20}"
     ;;
+  size)
+    cd "$ROOT" || exit 1
+    python3 "$LOOP_DIR/lap_audit.py" size .
+    ;;
+  tidy)
+    # STATUS 의 오래된 바퀴·"지금 상태"에서 넘친 항목을 docs/archive/ 로 옮긴다 (버리지 않음). 루프가 도는 중엔 하지 않는다
+    cd "$ROOT" || exit 1
+    if [ -n "$(running_pid)" ] && [ "${2:-}" != "--dry" ]; then
+      echo "✖ 루프가 도는 중 — 먼저 ctl.sh wrapup 으로 멈춘 뒤 (일꾼이 같은 파일을 고치고 있을 수 있음). 미리 보기는 ctl.sh tidy --dry"
+      exit 1
+    fi
+    python3 "$LOOP_DIR/lap_audit.py" tidy . ${2:+"$2"}
+    ;;
   try)
     LOOP_DRY_RUN=1 LOOP_MAX_LOOPS=2 LOOP_FORCE_SLEEP_SEC=1 bash "$LOOP_DIR/loop.sh"
     ;;
   *)
-    echo "사용: ctl.sh on|wrapup|off|kill|status|cost|try"; exit 1 ;;
+    echo "사용: ctl.sh on|wrapup|off|kill|status|cost|size|tidy|try"; exit 1 ;;
 esac

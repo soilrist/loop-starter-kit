@@ -1,4 +1,4 @@
-# 루프 스타터 키트 v2.3.0 (확정)
+# 루프 스타터 키트 v2.4.0 (확정)
 
 **"이거 만들어!" 한마디면 알아서 만들고, 정말 필요할 때만 물어보는 AI 개발팀**을 게임 프로젝트에 심는 키트예요.
 
@@ -48,6 +48,22 @@
 
 근거: Anthropic 개발자 글(claude.dev) *Spending your effort* · *What a task costs on Opus 5.5* · *Automating eval design and hillclimbing* · *A harness for every task* · *The new rules of context engineering*.
 
+## v2.4 에서 바뀐 것 — 실제 프로젝트 기록에서 찾은 약점
+세 프로젝트의 STATUS·INBOX·사고기록(바퀴 약 600개)을 읽고, 실제로 터진 것만 고쳤다.
+| 기록에 있던 일 | 이제 |
+|---|---|
+| STATUS "지금 상태"가 바퀴마다 한 문단씩 불어 300줄·13만 글자 — 일꾼이 매 바퀴 그걸 읽고 시작 | "지금 상태"는 15줄 현황판. 25줄을 넘으면 **루프 커밋 훅이 거절**. `loop/ctl.sh tidy` 가 넘친 항목과 오래된 바퀴를 `docs/archive/` 로 옮김 (한 줄도 안 버림) |
+| 안 닫힌 `확인` 69개가 INBOX 에 2주 넘게 쌓임 — 일꾼이 INBOX 를 통째로 읽음 | 일꾼은 **자기 몫 줄만** grep 으로 읽음. `확인` 은 사람이 아니라 **감독이 검산해서 닫음**. 12,000자·10개를 넘으면 `ctl.sh size`·`alerts.log` 가 알림 |
+| "항상 이렇게 해" 같은 상시 규칙이 INBOX 에 영구히 남음 | 상시 규칙은 컨벤션 문서나 `CLAUDE.md` 로 옮기고 INBOX 에서 지움 |
+| 눈 검사(3층)가 사실상 사라짐 — 최근 100바퀴 중 통과 7번, 나머지는 "못 함(감독 몫)" 이거나 "캡처는 봤는데 판정기가 인정 안 함" | 3층은 Jev 에 묻지 않음. **캡처를 실제로 열었는지를 loop.sh 가 도구 기록으로 대조** — 안 열고 "3층 통과"면 경고. 일꾼이 넘긴 칸은 감독이 직접 봄 |
+| 사람이 먼저 발견: 도구가 너무 작다 · 얼굴 대신 정수리만 보인다 · 도구 없으면 아무 안내 없이 "하나도 안 됨" · 폰에서 닿는 버튼이 없다 · 뒤로 가기로 창이 안 닫힌다 · 건물 뒤에 갇힌다 — 전부 시험은 통과 | 새 규칙 문서 **`PlayerEye.md`**: 처음 하는 사람 · 목표 기기의 손 · 게임 카메라에서 보이나 · 장르 상식 · 갇힘 없음. STATUS 에 `플레이어 눈:` 줄, 마일스톤마다 `처음 하는 사람 통 플레이` 조각 |
+| "원본 자세랑 맞추라니까 몇 번 설명하냐" — 시트에 숫자가 없어 매번 "맞췄다"로 통과 | 레퍼런스 시트에 **게임 카메라에서의 크기·자세를 숫자로** (캐릭터 키 대비 %, 동작 시간). 대조는 게임 카메라 캡처로만 |
+| 사람이 한 말을 감독이 기록에서 빠뜨려 같은 말을 다시 하게 함 | 사람 말은 **그 응답 안에서 따옴표 그대로** INBOX + 커밋, 응답 끝에 "받은 말 n개 → INBOX n줄" 대조. 같은 말 두 번째면 사고기록 |
+| 에디터가 죽은 채로 바퀴가 돌아 검사 전부 "못 함" | `env.sh` `LOOP_PREFLIGHT_CMD`: 바퀴 전에 싼 명령 하나로 확인, 실패하면 claude 를 부르지 않고 쉼 |
+| 수백 조각이 쌓인 뒤에야 "기본 조작이 안 된다" | 마일스톤 끝 `[!] 사람: 🎮 5분 해 보기`. **사람이 안 해 본 마일스톤이 2개 쌓이면 감독이 루프를 멈추고** 요청 (사람이 "그냥 계속"이라 하면 다시 켬) |
+
+**이미 돌던 프로젝트를 v2.4 로 올릴 때** (감독이 순서대로): ① `loop/ctl.sh wrapup` 으로 멈춤 ② 키트 파일 덮어쓰기(설치 규칙 2 — `loop/env.sh` 는 기존 값을 지키고 새 줄 `LOOP_EFFORT`·`LOOP_EFFORT_RETRY`·`LOOP_PREFLIGHT_CMD` 만 옮김) ③ `loop/ctl.sh size` → `loop/ctl.sh tidy` → `docs(status): 오래된 기록 보관` 커밋 ④ INBOX 의 `확인` 을 전부 검산해 닫고, 상시 규칙 줄을 `CLAUDE.md` 로 옮김 ⑤ `LOOP_PREFLIGHT_CMD` 를 이 프로젝트에 맞게 채움 ⑥ 다시 켬. ③을 건너뛰면 일꾼의 첫 STATUS 커밋이 훅에 거절된다 (거절 메시지가 `tidy` 를 안내한다).
+
 ## 확정된 규칙
 | 항목 | 정한 것 | 이유 |
 |---|---|---|
@@ -60,7 +76,7 @@
 | 파일 | 하는 일 |
 |---|---|
 | `CLAUDE.md` | 모든 AI가 제일 먼저 읽는 한 장 |
-| `docs/conventions/` | 규칙 원문 (이름·폴더·코드·데이터·커밋·브랜치·버전·검사·INBOX·**자율 판단**·**레퍼런스 충실**) |
+| `docs/conventions/` | 규칙 원문 (이름·폴더·코드·데이터·커밋·브랜치·버전·검사·INBOX·**자율 판단**·**레퍼런스 충실**·**플레이어 눈**) |
 | `docs/reference/` | 레퍼런스 시트 (화면·캐릭터마다 한 장 — 만들기 전에 쓰고, 캡처와 나란히 대조) |
 | `.claude/skills/` | `kickoff`(한마디→설계·로드맵), `new-script`, `new-content`, `commit`, `inbox`, `release` |
 | `.claude/agents/convention-checker.md` | 읽기 전용 규칙 점검 AI |
@@ -68,7 +84,7 @@
 | `.githooks/` | 커밋 메시지 형식·규칙 위반을 **커밋 순간에 막음** |
 | `tools/check_conventions.py` | 이름·엔진별 사이드카 파일·코드 접두어·안 채운 숫자·레퍼런스 시트 유무 자동 검사 (점검한 규칙 목록 출력) |
 | `tools/jev.py` | Jev(TypeSafe System One) 제3 판정기 — `evidence`(통과 인용이 진짜인가) · `noise`(엔진 에러 줄이 잡음인가) · `verdict`(결함 지적이 진짜인가) · `selftest`. 키는 Keychain `typesafe-api-key` 또는 `TYPESAFE_API_KEY` |
-| `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기), `lap_audit.py`(바퀴 기록 렌더·STATUS 인용 대조·턴/토큰/추정비용 집계) |
+| `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기), `lap_audit.py`(바퀴 기록 렌더·STATUS 인용 대조·눈 검사 대조·턴/토큰/추정비용 집계·문서 크기 점검과 보관) |
 | `evals/` · `.claude-plugin/` | 키트 자체 시험용 (`claude plugin eval`) — **프로젝트에는 복사하지 않음** |
 | `docs/DESIGN.md` `ROADMAP.md` `STATUS.md` `feedback/INBOX.md` | 기획서·조각 목록·바퀴 기록·우편함 |
 | `docs/templates/` | 기능 명세·버그·결정·사고기록 양식 |
@@ -79,7 +95,7 @@
 압축을 풀어 둔 뒤, **프로젝트 폴더를 연 Code 탭 세션**에 아래를 그대로 붙여넣으세요.
 
 ```
-루프 스타터 키트 v2.3.0 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
+루프 스타터 키트 v2.4.0 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
 키트의 README.md "설치 규칙"을 먼저 읽고 그대로 따라 줘.
 끝나면 결과를 5줄로 보고하고, 내가 정해야 할 것만 모아서 물어봐.
 루프는 아직 켜지 마.
@@ -123,7 +139,7 @@
    - `command -v claude` 와 `~/.claude-loop-nc` 폴더가 있는지 확인해 보고한다.
    - `python3 tools/jev.py selftest` 가 `SELFTEST_OK` 인지 확인한다. `UNAVAILABLE` 이면 키·SDK(`~/.claude/scripts/.venv`) 문제 — 고치지 말고 보고만 (루프는 `통과(jev 미확인)` 로 돌 수 있음).
 9. **커밋**
-   - `chore(loop): 루프 스타터 키트 v2.3.0 설치` 로 커밋한다 (훅 통과 확인).
+   - `chore(loop): 루프 스타터 키트 v2.4.0 설치` 로 커밋한다 (훅 통과 확인).
    - 사람이 확인한 뒤에만 커밋한다.
 10. **보고**: 설치된 것 / 합친 파일 / 기존 위반 수 / 사람이 정할 것.
 
@@ -140,7 +156,7 @@
 | **"꺼"** | 하던 조각 마무리하고 멈춤 |
 
 ## 키트 자체 검사 (키트를 고친 사람이 돌리는 것)
-`evals/` 의 7 케이스는 "규칙 문서·스킬이 있을 때 vs 없을 때" AI 답이 달라지는지를 `claude plugin eval` 로 잰다 (숫자 되묻기, 신호등, 커밋 형식, 검사기 보고, INBOX 형식, kickoff 질문, 검사 정직성). 키트 루트에서:
+`evals/` 의 8 케이스는 "규칙 문서·스킬이 있을 때 vs 없을 때" AI 답이 달라지는지를 `claude plugin eval` 로 잰다 (숫자 되묻기, 신호등, 커밋 형식, 검사기 보고, INBOX 형식, kickoff 질문, 검사 정직성, 플레이어 눈). 키트 루트에서:
 
 ```bash
 env ANTHROPIC_BASE_URL=https://api.anthropic.com ANTHROPIC_AUTH_TOKEN= ANTHROPIC_MODEL= ANTHROPIC_DEFAULT_OPUS_MODEL= ANTHROPIC_DEFAULT_SONNET_MODEL= ANTHROPIC_DEFAULT_HAIKU_MODEL= claude plugin eval . --scaffold --no-publish --trust-plugin --judge-model sonnet --runs 2 --ablation with-without
