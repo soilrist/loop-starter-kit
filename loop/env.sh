@@ -24,6 +24,12 @@ LOOP_FALLBACK_MODEL="opus"
 LOOP_EFFORT="medium"
 LOOP_EFFORT_RETRY="high"
 
+# 바퀴 전 점검 명령 (비우면 건너뜀). 종료코드 0 이 아니면 그 바퀴는 claude 를 부르지 않고 쉰다
+# 엔진 에디터·MCP 가 살아 있는지처럼 "이게 죽어 있으면 바퀴가 통째로 헛도는 것" 하나를 싸게 확인하는 명령을 감독이 넣는다
+# 예) Unity 상주 에디터: 'pgrep -f "Unity.*-projectPath" >/dev/null'   예) 로컬 서버: 'curl -fsS localhost:8080/health >/dev/null'
+LOOP_PREFLIGHT_CMD=""
+LOOP_PREFLIGHT_SLEEP_SEC=600
+
 # 한 바퀴 비용 상한(달러, 비우면 제한 없음) — claude --max-budget-usd
 LOOP_MAX_BUDGET_USD=""
 

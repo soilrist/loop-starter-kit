@@ -77,6 +77,7 @@ LIMIT_RE='usage.?limit|session limit|hit your|rate.?limit|limit.?reached|hit you
 
 idle=0
 count=0
+pre_fail=0
 
 while :; do
   # 설정은 매 바퀴 다시 읽는다 (재시작 없이 변경 반영)
@@ -104,6 +105,27 @@ while :; do
       alert "브랜치가 develop 이 아님($branch) — 루프 멈춤"
       touch "$LOOP_DIR/STOP"
       exit 0
+    fi
+  fi
+
+  # 바퀴 전 점검: 엔진·에디터·MCP 가 죽어 있으면 claude 를 부르지 않는다 (LOOP_PREFLIGHT_CMD, 비우면 건너뜀)
+  # 왜: 에디터가 죽은 채로 바퀴를 돌면 검사가 전부 "못 함" 인 바퀴에 사용량만 쓴다
+  if [ "$LOOP_DRY_RUN" != "1" ] && [ -n "${LOOP_PREFLIGHT_CMD:-}" ]; then
+    if run_with_timeout "${LOOP_PREFLIGHT_TIMEOUT_SEC:-120}" bash -c "$LOOP_PREFLIGHT_CMD" > logs/preflight.log 2>&1; then
+      pre_fail=0
+    else
+      pre_fail=$((pre_fail + 1))
+      # 처음과 그 뒤 6번째마다만 알린다 (같은 경고로 alerts.log 를 채우지 않게)
+      if [ "$pre_fail" -eq 1 ] || [ $((pre_fail % 6)) -eq 0 ]; then
+        alert "바퀴 전 점검 실패 ${pre_fail}번째 — 바퀴를 돌지 않고 쉼: $(tail -n 1 logs/preflight.log | cut -c1-120)"
+      fi
+      count=$((count + 1))
+      if [ -n "${LOOP_MAX_LOOPS:-}" ] && [ "$count" -ge "$LOOP_MAX_LOOPS" ]; then
+        log "최대 바퀴 수($LOOP_MAX_LOOPS) 도달 → 종료"
+        exit 0
+      fi
+      nap "${LOOP_PREFLIGHT_SLEEP_SEC:-600}"
+      continue
     fi
   fi
 
@@ -189,6 +211,14 @@ while :; do
   if [ "$LOOP_DRY_RUN" != "1" ] && [ "$commits" != "0" ]; then
     audit="$(python3 "$LOOP_DIR/lap_audit.py" check "$raw" "$pre" 2>&1)" || alert "바퀴 #$lap 검사 인용 불일치 — $audit"
     log "감사: $audit"
+  fi
+
+  # 매 바퀴 다시 읽히는 문서(STATUS "지금 상태"·INBOX)가 불었는지 — 하루에 한 번만 알린다
+  if [ "$LOOP_DRY_RUN" != "1" ]; then
+    today="$(date '+%Y-%m-%d')"
+    if [ "$(cat logs/size_alert_day 2>/dev/null)" != "$today" ]; then
+      grown="$(python3 "$LOOP_DIR/lap_audit.py" size "$ROOT" 2>&1)" || { alert "문서가 불어 매 바퀴 읽는 값이 커짐 — $grown"; echo "$today" > logs/size_alert_day; }
+    fi
   fi
 
   # 작업 트리에 커밋 안 된 루프 흔적이 남았는지

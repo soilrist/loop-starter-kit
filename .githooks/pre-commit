@@ -21,4 +21,17 @@ if [ -n "${LOOP_LAP:-}" ]; then
   fi
 fi
 
+# 루프 커밋: STATUS "지금 상태" 가 일지처럼 불어나면 거절한다
+# 왜: 일꾼이 매 바퀴 제일 먼저 읽는 자리다. 한 프로젝트에서 300줄(13만 글자)까지 불어 매 바퀴가 그걸 읽고 시작했다
+if [ -n "${LOOP_LAP:-}" ] && [ -f loop/lap_audit.py ] && git diff --cached --name-only | grep -qx 'docs/STATUS.md'; then
+  now_lines="$(git show :docs/STATUS.md | "$PY" loop/lap_audit.py statelines 2>/dev/null)"
+  case "$now_lines" in ''|*[!0-9]*) now_lines=0 ;; esac
+  if [ "$now_lines" -gt 25 ]; then
+    echo "✖ 커밋 거절: STATUS '지금 상태' 가 ${now_lines}줄 (25줄 넘음)"
+    echo "  '지금 상태' 는 덧붙이는 일지가 아니라 고쳐 쓰는 현황판이다 (15줄 이내). 지난 바퀴 이야기는 아래 바퀴 기록에 이미 있다."
+    echo "  넘친 것을 지우지 말고: python3 loop/lap_audit.py tidy .  → docs/STATUS.md 와 docs/archive/STATUS-<오늘>.md 를 같이 git add 해서 다시 커밋"
+    exit 1
+  fi
+fi
+
 "$PY" tools/check_conventions.py --staged --quiet

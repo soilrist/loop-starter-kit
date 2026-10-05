@@ -1,4 +1,4 @@
-# CLAUDE.md — 이 저장소에서 일하는 모든 AI가 먼저 읽는 한 장 (키트 v2.3.0)
+# CLAUDE.md — 이 저장소에서 일하는 모든 AI가 먼저 읽는 한 장 (키트 v2.4.0)
 
 > **짧게 유지한다 (200줄 이내).** 규칙 원문은 여기 적지 않는다 — 아래 문서 목록에서 지금 하는 일에 맞는 문서 **하나만** 연다.
 > **규칙은 `docs/conventions/` 에만 적는다.** 이 파일·스킬·에이전트·PROMPT 와 내용이 다르면 **컨벤션 문서가 이긴다.**
@@ -11,7 +11,8 @@
 
 ## 반드시 지킬 것 (원칙만 — 자세한 건 괄호 속 문서)
 1. 밸런스 숫자는 루프가 정하고 `docs/DESIGN.md` §6 에 값+근거를 적는다. 사람에게 묻지 않는다. `-1` 을 커밋에 남기지 않는다. (DataDriven)
-2. 캡처는 검사다, 증거가 아니다. **"통과"는 실제로 명령을 돌리고 그 출력을 STATUS 에 인용하고, `tools/jev.py evidence` 가 `SUPPORTED` 라고 했을 때만.** 판단은 이름·문자열 패턴이 아니라 실제 결과로. (Verification)
+2. 캡처는 검사다, 증거가 아니다. **1·2층 "통과"는 실제로 명령을 돌리고 그 출력을 STATUS 에 인용하고, `tools/jev.py evidence` 가 `SUPPORTED` 라고 했을 때만. 3층 "통과"는 게임 카메라 캡처를 실제로 열어 보고 어느 그림을 봤는지 적었을 때만.** 판단은 이름·문자열 패턴이 아니라 실제 결과로. (Verification)
+2-2. 시험이 통과해도 플레이어가 못 쓰면 실패다. 보이거나 만지는 조각은 **처음 켠 사람 눈**으로 다섯 칸을 본다: 처음 하는 사람 · 목표 기기의 손 · 게임 카메라에서 보이나 · 장르 상식 · 갇힘 없음. (PlayerEye)
 2-1. 레퍼런스 게임 하나를 **완벽하게 복제한다는 자세**로 만든다 — 시스템·콘텐츠 종류·UI 흐름은 전부, 에셋 원본·이름은 새로. 보이는 것은 레퍼런스 시트 먼저, 자리표시 품질로 합격 찍지 않는다. (Reference)
 3. 자기가 바꾼 파일만 이름으로 지정해 커밋한다. (GitCommit)
 4. 씬·에셋 파일을 텍스트로 함부로 고치지 않는다. 파일 이동·이름 변경은 에디터(또는 엔진 MCP 의 에셋 명령)로. 엔진별 구체 방법은 `docs/engines/<엔진>.md`. (FolderStructure)
@@ -48,6 +49,7 @@
 | 브랜치 만들기·합치기 | `docs/conventions/BranchStrategy.md` |
 | 버전·변경기록 | `docs/conventions/Versioning.md` |
 | 검사·캡처·QA | `docs/conventions/Verification.md` + `docs/checks/<엔진>.md` |
+| 플레이어가 보거나 만지는 조각(조작·UI·장비·동작·맵) · 마일스톤 끝 | `docs/conventions/PlayerEye.md` |
 | INBOX 읽기·쓰기 | `docs/conventions/InboxFormat.md` |
 | 혼자 정할지 물을지 애매할 때 | `docs/conventions/Autonomy.md` |
 | 기능 명세·버그·결정·사고기록 | `docs/templates/` 양식 복사 |
