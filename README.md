@@ -1,4 +1,4 @@
-# 루프 스타터 키트 v2.2.0 (확정)
+# 루프 스타터 키트 v2.3.0 (확정)
 
 **"이거 만들어!" 한마디면 알아서 만들고, 정말 필요할 때만 물어보는 AI 개발팀**을 게임 프로젝트에 심는 키트예요.
 
@@ -34,6 +34,20 @@
 | 스킬이 규칙 원문을 복사해 컨벤션 문서와 어긋남 | 스킬은 절차만, 규칙은 문서 포인터 (`kickoff`·`new-content`) |
 | 키트가 AI 행동을 정말 바꾸는지 잴 방법 없음 | `evals/` 7 케이스 — `claude plugin eval` 로 with/without 비교 (아래 "키트 자체 검사") |
 
+## v2.3 에서 바뀐 것
+| 문제였던 것 | 이제 |
+|---|---|
+| 바퀴가 얼마를 쓰는지 "시간"만 남아, 설정을 바꿔도 나아졌는지 알 수 없음 | `logs/usage.csv` 에 바퀴마다 **노력 단계·턴 수·토큰·추정비용** 칸 추가. `loop/ctl.sh cost` 가 "일한 바퀴 하나당" 평균과 헛바퀴가 쓴 몫을 보여 줌 (형은 감독에게 "얼마나 썼어?") |
+| 모델만 고르고 "힘을 얼마나 쓸지"는 못 정함 | `env.sh` 에 `LOOP_EFFORT`(평소 `medium`) · `LOOP_EFFORT_RETRY`(직전 바퀴가 일한 커밋 없이 끝났을 때만 `high`) — claude `--effort` |
+| 설정을 감으로 바꿈 | 감독 규칙: 한 번에 하나만 바꾸고 `ctl.sh cost` 로 전후 비교, 안 나아지면 되돌림 |
+| 감독이 일꾼의 자기평가를 먼저 읽고 검수 | diff·캡처를 먼저 보고 판단을 정한 뒤에 STATUS 를 읽음 (만든 눈 ≠ 검사하는 눈) |
+| 일꾼이 파일을 하나씩 읽어 턴이 늘어남 | PROMPT 규칙 3: 서로 기다릴 필요 없는 읽기·검색은 한 번에 묶고, 읽은 파일은 다시 안 읽음 |
+| 프로젝트 고유의 버릇까지 규칙으로 쌓여 문서가 길어짐 | `CLAUDE.md` "함정" 절 (20줄 이내) — 규칙 대신 "하면 깨지는 것" 한 줄 |
+| 키트 규칙을 고칠 때 기준이 "with > without" 한 줄뿐 | "키트 자체 검사"에 고치는 순서 추가: 한 번에 한 문서, 전후 점수 비교, 시험 문제의 정답 문장을 규칙에 베끼지 않기 |
+| 옛 claude 가 새 옵션을 몰라 바퀴가 조용히 헛돎 | `--effort` 를 모르면 `alerts.log` 에 원인과 고치는 법을 바로 올림. 옛 `usage.csv` 는 `usage-pre23.csv` 로 보관 |
+
+근거: Anthropic 개발자 글(claude.dev) *Spending your effort* · *What a task costs on Opus 5.5* · *Automating eval design and hillclimbing* · *A harness for every task* · *The new rules of context engineering*.
+
 ## 확정된 규칙
 | 항목 | 정한 것 | 이유 |
 |---|---|---|
@@ -54,7 +68,7 @@
 | `.githooks/` | 커밋 메시지 형식·규칙 위반을 **커밋 순간에 막음** |
 | `tools/check_conventions.py` | 이름·엔진별 사이드카 파일·코드 접두어·안 채운 숫자·레퍼런스 시트 유무 자동 검사 (점검한 규칙 목록 출력) |
 | `tools/jev.py` | Jev(TypeSafe System One) 제3 판정기 — `evidence`(통과 인용이 진짜인가) · `noise`(엔진 에러 줄이 잡음인가) · `verdict`(결함 지적이 진짜인가) · `selftest`. 키는 Keychain `typesafe-api-key` 또는 `TYPESAFE_API_KEY` |
-| `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기), `lap_audit.py`(바퀴 기록 렌더·STATUS 인용 대조) |
+| `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기), `lap_audit.py`(바퀴 기록 렌더·STATUS 인용 대조·턴/토큰/추정비용 집계) |
 | `evals/` · `.claude-plugin/` | 키트 자체 시험용 (`claude plugin eval`) — **프로젝트에는 복사하지 않음** |
 | `docs/DESIGN.md` `ROADMAP.md` `STATUS.md` `feedback/INBOX.md` | 기획서·조각 목록·바퀴 기록·우편함 |
 | `docs/templates/` | 기능 명세·버그·결정·사고기록 양식 |
@@ -65,7 +79,7 @@
 압축을 풀어 둔 뒤, **프로젝트 폴더를 연 Code 탭 세션**에 아래를 그대로 붙여넣으세요.
 
 ```
-루프 스타터 키트 v2.2.0 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
+루프 스타터 키트 v2.3.0 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
 키트의 README.md "설치 규칙"을 먼저 읽고 그대로 따라 줘.
 끝나면 결과를 5줄로 보고하고, 내가 정해야 할 것만 모아서 물어봐.
 루프는 아직 켜지 마.
@@ -104,11 +118,12 @@
    - 7-1. **코드 그래프**: `command -v graphify` 가 있으면 `/graphify .` 로 `graphify-out/` 을 만들고 `.gitignore` 에 `/graphify-out/` 을 넣는다 (그래프는 커밋하지 않음). 없으면 이 단계는 건너뛰고 보고에 한 줄 적는다 — 루프는 그래프가 있을 때만 `graphify query` 를 쓴다. 갱신은 감독이 마일스톤 끝에 `/graphify . --update`.
 8. **루프 시험**
    - `loop/ctl.sh try` 로 claude 를 부르지 않는 시험 두 바퀴를 돌린다 (번호는 `logs/lap.dry` 에 따로 셈).
-   - `logs/usage.csv` 에 `dry` 두 줄이 생겼는지 확인한다.
+   - `logs/usage.csv` 에 `dry` 두 줄이 생겼는지 확인한다. `python3 loop/lap_audit.py selftest` 가 `SELFTEST_OK` 인지도 본다.
+   - 이미 루프가 돌던 프로젝트를 올리는 경우: 옛 `loop/env.sh` 에 `LOOP_EFFORT`·`LOOP_EFFORT_RETRY` 두 줄이 없으면 키트의 값을 옮겨 적는다 (없어도 루프는 돌고, 노력 단계만 claude 기본값이 된다).
    - `command -v claude` 와 `~/.claude-loop-nc` 폴더가 있는지 확인해 보고한다.
    - `python3 tools/jev.py selftest` 가 `SELFTEST_OK` 인지 확인한다. `UNAVAILABLE` 이면 키·SDK(`~/.claude/scripts/.venv`) 문제 — 고치지 말고 보고만 (루프는 `통과(jev 미확인)` 로 돌 수 있음).
 9. **커밋**
-   - `chore(loop): 루프 스타터 키트 v2.2.0 설치` 로 커밋한다 (훅 통과 확인).
+   - `chore(loop): 루프 스타터 키트 v2.3.0 설치` 로 커밋한다 (훅 통과 확인).
    - 사람이 확인한 뒤에만 커밋한다.
 10. **보고**: 설치된 것 / 합친 파일 / 기존 위반 수 / 사람이 정할 것.
 
@@ -132,6 +147,16 @@ env ANTHROPIC_BASE_URL=https://api.anthropic.com ANTHROPIC_AUTH_TOKEN= ANTHROPIC
 ```
 
 앞의 `env …=` 는 settings.json 이 옴니라우터 별칭을 가리킬 때 공식 API 로 되돌리는 것 — 그대로 두면 판정 모델을 못 찾아 실패한다. 결과는 `evals/results/` (커밋 안 함). 기준: with 점수가 without 보다 높아야 하고, 떨어진 케이스는 그 규칙 문서를 고친 뒤 다시 잰다.
+
+**규칙 문서·PROMPT·스킬을 고칠 때의 순서** (감으로 고치지 않기):
+1. 고치기 **전에** 위 명령으로 점수를 한 번 잰다 (기준 점수).
+2. **한 번에 한 문서, 한 가지만** 고친다. 왜: 둘을 같이 고치면 무엇이 효과였는지 모른다.
+3. 다시 잰다. 겨냥한 케이스가 오르고 **다른 케이스가 안 떨어졌을 때만** 유지한다. 안 올랐거나 다른 게 떨어졌으면 되돌린다. `--runs 2` 사이의 흔들림보다 작은 차이는 오른 게 아니다.
+4. 시험 문제(`evals/*/case.yaml`)의 상황·정답 문장을 규칙 문서에 **그대로 베껴 넣지 않는다.** 왜: 그 케이스만 맞히고 실제 바퀴에서는 안 지켜지는 "시험 문제 외우기"가 된다. 규칙은 원리로 적는다.
+5. 실제 프로젝트에서 새로 본 실수는 규칙을 고치기 전에 **새 케이스로 먼저 추가**한다 (지금 규칙으로는 틀린다는 걸 확인한 뒤 고친다).
+6. 2~3번 고쳐도 안 오르는 케이스는 규칙이 아니라 **케이스나 채점 기준(`graders/criteria.md`)이 틀렸을 수 있다** — 그쪽을 먼저 다시 읽는다.
+
+실제 루프의 설정(모델·노력 단계·쉬는 시간)은 eval 이 아니라 `loop/ctl.sh cost` 의 전후 비교로 같은 순서를 따른다 (`loop/DIRECTOR.md` 감시 & 검수 5).
 
 ## 출처
 - Unity `.gitignore`: github/gitignore

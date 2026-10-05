@@ -6,6 +6,7 @@
 #   off     다음 바퀴부터 멈추기 (진행 중인 바퀴는 끝까지)
 #   kill    지금 즉시 강제 종료 + launchd 해제
 #   status  상태 보기
+#   cost    최근 20바퀴의 "일한 바퀴 하나당" 턴·토큰·추정비용 (cost 50 처럼 바퀴 수 지정 가능)
 #   try     시험 두 바퀴 (claude 안 부름, 설치 확인용)
 # ─────────────────────────────────────────────
 set -u
@@ -95,13 +96,17 @@ case "${1:-status}" in
     echo "실행 중   : ${pid:-아니오}"
     echo "STOP/WRAPUP: $( [ -f "$LOOP_DIR/STOP" ] && echo STOP ) $( [ -f "$LOOP_DIR/WRAPUP" ] && echo WRAPUP )"
     echo "마지막 바퀴: $(cat logs/lap 2>/dev/null || echo 0)"
-    echo "설정      : 모델 $LOOP_MODEL / 쉬는 시간 ${LOOP_SLEEP_SEC}초 / 계정 $LOOP_ACCOUNTS"
+    echo "설정      : 모델 $LOOP_MODEL / 노력 ${LOOP_EFFORT:-기본}(막히면 ${LOOP_EFFORT_RETRY:-그대로}) / 쉬는 시간 ${LOOP_SLEEP_SEC}초 / 계정 $LOOP_ACCOUNTS"
     echo "--- 최근 바퀴"; tail -n 5 logs/usage.csv 2>/dev/null || echo "(없음)"
     echo "--- 경고";     tail -n 5 logs/alerts.log 2>/dev/null || echo "(없음)"
+    ;;
+  cost)
+    cd "$ROOT" || exit 1
+    python3 "$LOOP_DIR/lap_audit.py" report logs/usage.csv "${2:-20}"
     ;;
   try)
     LOOP_DRY_RUN=1 LOOP_MAX_LOOPS=2 LOOP_FORCE_SLEEP_SEC=1 bash "$LOOP_DIR/loop.sh"
     ;;
   *)
-    echo "사용: ctl.sh on|wrapup|off|kill|status|try"; exit 1 ;;
+    echo "사용: ctl.sh on|wrapup|off|kill|status|cost|try"; exit 1 ;;
 esac

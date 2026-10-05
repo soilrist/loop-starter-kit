@@ -1,6 +1,6 @@
 {
   "name": "loop-starter-kit",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "게임 프로젝트용 자율 루프 키트 — claude plugin eval 로 규칙 문서·스킬이 AI 행동을 실제로 바꾸는지 재는 매니페스트",
   "skills": "./.claude/skills",
   "agents": [

@@ -4,17 +4,25 @@
   render <lap.jsonl>            일꾼의 최종 답 + 실행한 명령 목록을 사람이 읽을 글로 출력
   check  <lap.jsonl> <pre-sha>  이번 바퀴가 STATUS 에 적은 "통과(`인용`)" 이 실제 도구 출력에 있는지 대조.
                                 없으면 사유를 출력하고 종료코드 1 (loop.sh 가 alerts.log 에 올림)
-  selftest                      내장 자료로 render/check 동작 확인 (SELFTEST_OK)
+  usage  <lap.jsonl>            이번 바퀴의 `턴,새입력토큰,출력토큰,캐시읽기토큰,추정비용` 한 줄 (loop.sh 가 usage.csv 에 붙임).
+                                기록이 없으면 빈 칸 `,,,,` — 항상 종료코드 0
+  report [usage.csv] [바퀴수]   최근 바퀴(기본 20)의 "일한 바퀴 하나당" 턴·토큰·추정비용, 헛바퀴가 쓴 몫,
+                                모델·노력 단계별 비교를 사람이 읽을 글로 출력 (`loop/ctl.sh cost`)
+  selftest                      내장 자료로 render/check/usage/report 동작 확인 (SELFTEST_OK)
 
 왜: `--output-format text` 로는 최종 답만 남아 "정말 명령을 돌렸나"를 아무도 대조할 수 없었다.
 stream-json 을 남기면 도구 호출·결과가 전부 있으니 인용을 기계로 대조한다 (Verification.md 1).
+같은 기록의 마지막 `result` 줄에 턴 수·토큰·추정비용이 있다 — 설정을 바꾼 게 나아졌는지 감이 아니라 숫자로 본다.
+추정비용은 API 값으로 환산한 것이라 구독 계정의 실제 청구액이 아니다. 전후 비교용으로만 쓴다.
 """
+import csv
 import json
 import re
 import subprocess
 import sys
 
 PASS_RE = re.compile(r"통과\(`([^`]+)`\)")
+USAGE_COLS = ("turns", "in_tok", "out_tok", "cache_read", "cost_usd")
 
 
 def _events(path):
@@ -103,7 +111,126 @@ def check(path, pre_sha):
     return 0
 
 
+def usage_fields(events):
+    """마지막 result 줄 → (턴, 새 입력 토큰, 출력 토큰, 캐시 읽기 토큰, 추정비용). 없으면 전부 빈 문자열."""
+    last = None
+    for ev in events:
+        if ev.get("type") == "result":
+            last = ev
+    if last is None:
+        return ("", "", "", "", "")
+    u = last.get("usage") or {}
+
+    def num(v):
+        return v if isinstance(v, (int, float)) and not isinstance(v, bool) else 0
+
+    fresh = num(u.get("input_tokens")) + num(u.get("cache_creation_input_tokens"))
+    cost = last.get("total_cost_usd")
+    return (
+        str(num(last.get("num_turns"))),
+        str(fresh),
+        str(num(u.get("output_tokens"))),
+        str(num(u.get("cache_read_input_tokens"))),
+        f"{cost:.4f}" if isinstance(cost, (int, float)) and not isinstance(cost, bool) else "",
+    )
+
+
+def usage(path):
+    try:
+        fields = usage_fields(_events(path))
+    except OSError:
+        fields = ("", "", "", "", "")
+    print(",".join(fields))
+
+
+def _f(row, key):
+    try:
+        return float(row.get(key) or "")
+    except (TypeError, ValueError):
+        return None
+
+
+def _work(row):
+    """commits 칸은 `전체/일한` — 일한 커밋 수"""
+    try:
+        return int(str(row.get("commits") or "0/0").split("/")[-1])
+    except ValueError:
+        return 0
+
+
+def _avg(rows, key):
+    vals = [v for v in (_f(r, key) for r in rows) if v is not None]
+    return sum(vals) / len(vals) if vals else None
+
+
+def _fmt(v, unit="", digits=0):
+    return "?" if v is None else f"{v:,.{digits}f}{unit}"
+
+
+def report_lines(rows, last_n=20):
+    rows = [r for r in rows if (r.get("account") or "") != "dry"][-last_n:]
+    if not rows:
+        return ["기록된 바퀴가 없음"]
+    measured = [r for r in rows if _f(r, "turns") is not None]
+    worked = [r for r in measured if _work(r) > 0]
+    idle = [r for r in measured if _work(r) == 0]
+    out = [f"최근 {len(rows)}바퀴 (측정값 있는 바퀴 {len(measured)}개 · 일한 바퀴 {len(worked)}개 · 헛바퀴 {len(idle)}개)"]
+    if not measured:
+        out.append("턴·토큰 측정값이 아직 없음 — 키트 v2.3 이후 바퀴부터 쌓인다")
+        return out
+    out.append(
+        "일한 바퀴 하나당: 턴 " + _fmt(_avg(worked, "turns"), "", 1)
+        + " · 출력 " + _fmt(_avg(worked, "out_tok"), " 토큰")
+        + " · 새 입력 " + _fmt(_avg(worked, "in_tok"), " 토큰")
+        + " · 추정 $" + _fmt(_avg(worked, "cost_usd"), "", 2)
+    )
+    total = sum(v for v in (_f(r, "cost_usd") for r in measured) if v is not None)
+    wasted = sum(v for v in (_f(r, "cost_usd") for r in idle) if v is not None)
+    if total > 0:
+        out.append(f"헛바퀴가 쓴 몫: 추정 ${wasted:,.2f} / ${total:,.2f} ({wasted / total * 100:.0f}%)")
+    groups = {}
+    for r in worked:
+        groups.setdefault(((r.get("model") or "?"), (r.get("effort") or "기본")), []).append(r)
+    if len(groups) > 1:
+        out.append("설정별 (일한 바퀴만 — 바퀴 수가 5개 미만이면 믿지 말 것):")
+        for (model, effort), rs in sorted(groups.items()):
+            out.append(
+                f"  {model} / 노력 {effort}: {len(rs)}바퀴 · 턴 " + _fmt(_avg(rs, "turns"), "", 1)
+                + " · 추정 $" + _fmt(_avg(rs, "cost_usd"), "", 2)
+            )
+    out.append("추정비용은 API 값 환산 — 구독 계정의 청구액이 아니라 전후 비교용")
+    return out
+
+
+def report(path="logs/usage.csv", last_n=20):
+    try:
+        with open(path, encoding="utf-8", errors="replace", newline="") as f:
+            rows = list(csv.DictReader(f))
+    except OSError:
+        print(f"{path} 를 못 읽음 — 루프가 한 바퀴도 안 돌았거나 경로가 다름")
+        return 1
+    print("\n".join(report_lines(rows, last_n)))
+    return 0
+
+
 def selftest():
+    res = {"type": "result", "num_turns": 12, "total_cost_usd": 0.51234,
+           "usage": {"input_tokens": 100, "cache_creation_input_tokens": 900,
+                     "cache_read_input_tokens": 50000, "output_tokens": 4000}}
+    assert usage_fields([{"type": "assistant"}, res]) == ("12", "1000", "4000", "50000", "0.5123"), "usage 칸 계산이 틀림"
+    assert usage_fields([{"type": "assistant"}]) == ("", "", "", "", ""), "result 없는 기록에 값을 지어냄"
+    assert usage_fields([{"type": "result"}]) == ("0", "0", "0", "0", ""), "빈 result 처리"
+    rows = [
+        {"account": "dry", "commits": "0/0"},
+        {"account": "nc", "model": "sonnet", "commits": "2/1", "effort": "medium", "turns": "20", "in_tok": "1000", "out_tok": "5000", "cost_usd": "1.00"},
+        {"account": "nc", "model": "sonnet", "commits": "1/0", "effort": "high", "turns": "30", "in_tok": "1000", "out_tok": "9000", "cost_usd": "3.00"},
+        {"account": "nc", "model": "sonnet", "commits": "1/1"},
+    ]
+    rep = "\n".join(report_lines(rows))
+    assert "최근 3바퀴 (측정값 있는 바퀴 2개 · 일한 바퀴 1개 · 헛바퀴 1개)" in rep, rep
+    assert "턴 20.0" in rep and "$1.00" in rep, rep
+    assert "$3.00 / $4.00 (75%)" in rep, rep
+    assert report_lines([{"account": "dry"}]) == ["기록된 바퀴가 없음"]
     out = "✔ 규칙 검사 통과 (경고 0 / 미정 숫자 0)\nPassed: 3, Failed: 0"
     ok = ["검사: 1층 통과(`✔ 규칙 검사 통과 (경고 0 / 미정 숫자 0)`) / 2층 통과(`Passed: 3, Failed: 0`)"]
     bad = ["검사: 1층 통과(`✔ 규칙 검사 통과 (경고 1)`)"]
@@ -120,6 +247,10 @@ if __name__ == "__main__":
         render(a[1])
     elif a[:1] == ["check"] and len(a) == 3:
         sys.exit(check(a[1], a[2]))
+    elif a[:1] == ["usage"] and len(a) == 2:
+        usage(a[1])
+    elif a[:1] == ["report"] and len(a) <= 3:
+        sys.exit(report(a[1] if len(a) > 1 else "logs/usage.csv", int(a[2]) if len(a) > 2 and a[2].isdigit() else 20))
     elif a[:1] == ["selftest"]:
         selftest()
     else:
