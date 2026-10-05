@@ -26,6 +26,7 @@
 - 작업 트리 깨끗함 (`develop` 이 아니면 `ctl.sh on` 이 옮겨 주거나 만들어 준다)
 - `loop/ctl.sh size` 가 "문서 크기 정상" (아니면 아래 "문서 살림" 먼저)
 - `loop/env.sh` 의 `LOOP_PREFLIGHT_CMD` — 이 프로젝트에서 "죽어 있으면 바퀴가 통째로 헛도는 것"(상주 에디터·엔진 MCP·로컬 서버) 하나를 확인하는 명령을 넣었는지. 직접 한 번 돌려 종료코드 0 을 본다
+- `loop/ctl.sh status` 의 "일꾼 MCP" 줄이 이 프로젝트에 맞는지 — 일꾼이 엔진 MCP 로 일해야 하는데 "없음"이면 `loop/mcp.json` 부터 (가벼운 바퀴는 루트 `.mcp.json`·전역 MCP 를 안 싣는다)
 - `git config core.hooksPath` = `.githooks`
 - ROADMAP 에 `[ ]` 조각 있음 (없으면 kickoff 먼저)
 - `python3 tools/check_conventions.py` 오류 0

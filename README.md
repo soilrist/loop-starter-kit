@@ -150,6 +150,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
    - `python3 tools/check_conventions.py` 를 돌린다 (엔진 프로젝트가 하위 폴더면 `--root <폴더>`).
    - 기존 파일의 위반은 **지금 고치지 않는다.** 목록만 보여 주고, ROADMAP 맨 앞에 `M0-00 기존 파일 규칙 맞추기` 조각으로 넣는다. 파일 이동은 루프가 에디터·엔진 MCP 로 한다.
    - 7-1. **코드 그래프**: `command -v graphify` 가 있으면 `/graphify .` 로 `graphify-out/` 을 만들고 `.gitignore` 에 `/graphify-out/` 을 넣는다 (그래프는 커밋하지 않음). 없으면 이 단계는 건너뛰고 보고에 한 줄 적는다 — 루프는 그래프가 있을 때만 `graphify query` 를 쓴다. 갱신은 감독이 마일스톤 끝에 `/graphify . --update`.
+   - 7-2. **일꾼이 쓸 것은 프로젝트로**: 가벼운 바퀴의 일꾼은 사람 전역 스킬·플러그인·MCP 를 못 본다. ① 일꾼이 **엔진 MCP 로 일해야 하면**(예: Unity `unityMCP`) 그 서버 설정을 `loop/mcp.json` 에 적는다 — 루트 `.mcp.json` 과 `~/.claude.json` 것은 일꾼에게 안 간다. 명령줄·커맨드릿으로만 일하면 만들지 않는다. ② 전역(`~/.claude/skills`)의 엔진 스킬 중 **일꾼이 쓸 것만** 프로젝트 `.claude/skills/` 로 복사한다. 전부 넣지 않는다 — 스킬 목록은 모든 호출에 실린다. 감독만 쓰는 것(영상 보기 `watch` · 과설계 점검 · 그림 그리기)은 옮기지 않는다. ③ `CLAUDE.md` "프로젝트" 절의 "만드는 도구" 칸을 채운다. 확인은 `loop/ctl.sh status` 의 "일꾼 MCP" 줄.
 8. **루프 시험**
    - `loop/ctl.sh try` 로 claude 를 부르지 않는 시험 두 바퀴를 돌린다 (번호는 `logs/lap.dry` 에 따로 셈).
    - `logs/usage.csv` 에 `dry` 두 줄이 생겼는지 확인한다. `python3 loop/lap_audit.py selftest` 가 `SELFTEST_OK` 인지도 본다.

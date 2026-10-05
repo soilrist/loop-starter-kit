@@ -6,6 +6,7 @@
 ## 프로젝트
 - 게임: 〔한 줄 소개〕 / 장르: 〔〕
 - 엔진: 〔Unity / Unreal / Godot〕 〔버전〕 · 렌더 〔URP 2D 등〕 · 엔진 프로젝트 위치 〔저장소 루트 / unity·unreal·godot/〕 — 엔진별 구체 규칙은 `docs/engines/<엔진>.md`
+- 그림·모델·소리 만드는 도구: 〔예: Blender 스크립트(`tools/blender/`) · ComfyUI · 없음〕 — 일꾼이 실제로 쓸 수 있는 것만 적는다 (전역 스킬·MCP 는 일꾼 눈에 안 보임 — 설치 규칙 7-2)
 - 설계서 `docs/DESIGN.md` · 진행 `docs/STATUS.md` · 순서 `docs/ROADMAP.md`
 - 사람의 지시: `docs/feedback/INBOX.md` (맨 위가 최우선)
 
