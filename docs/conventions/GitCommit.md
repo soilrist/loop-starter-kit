@@ -38,7 +38,7 @@ Inbox: 고블린 이동속도
 | `merge` | 브랜치 합치기 — 우리 추가 |
 
 ## 범위 (괄호 안)
-소문자·하이픈 한 단어. 시스템 이름: `combat`, `ui`, `input`, `camera`, `inventory`, `enemy`, `skill`, `quest`, `dialogue`, `audio`, `map`, `save`, `data`, `loop`, `status`, `inbox`, `design`, `roadmap`, `conventions`.
+소문자·하이픈 한 단어. 시스템 이름: `combat`, `ui`, `input`, `camera`, `inventory`, `enemy`, `skill`, `quest`, `dialogue`, `audio`, `map`, `save`, `data`, `loop`, `status`, `inbox`, `design`, `roadmap`, `reference`, `conventions`.
 새 범위가 필요하면: 목록 안 단어로 먼저 표현해 보고, 정말 없으면 루프는 가장 가까운 범위를 쓰고 INBOX `질문`으로 추가를 제안한다. 목록 수정은 사람 승인 후 감독이.
 
 ## 꼬리말 (검증용 — 루프 커밋은 필수)

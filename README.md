@@ -75,6 +75,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
 | 로그인이 만료된 계정으로 바퀴가 5초씩 헛돎 (Snarehaven 10-03) | 한도 판정에 로그인 만료 문구 추가 → 다음 계정으로 넘어감 |
 | `확인` 줄에 STATUS 내용을 통째로 다시 적음 | `InboxFormat.md` 12: 2문장 이내 + 근거 위치 하나 |
 | 움직임(걷기·도구 쓰기)을 정지 캡처로만 대조 — "영상 보고 똑같이"가 사람 지시로만 있었음 | `Reference.md` 2-1 **동작 관찰표**: 감독이 레퍼런스 영상 프레임을 잘라 직접 보고 `영상 ID + 시각`·주기·자세를 표로. 못 본 칸은 `확인 못 함`. 전 품목 한 번에 |
+| 스킬이 코드(`new-script`)·데이터(`new-content`)뿐 — 정작 로드맵 조각의 절반 이상인 화면·모델·아이콘·동작에는 작업 카드가 없어, 일꾼이 규칙 문서 네 개를 알아서 찾아 읽어야 했음 | 스킬 **`new-visual`**(시트 → 만들기 → 게임 카메라 캡처 열어 대조 → 플레이어 눈) · **`reference-sheet`**(시트·동작 관찰표 만드는 순서와 프레임 자르는 명령). 규칙은 그대로 `Reference.md`·`PlayerEye.md` 에 있고 스킬은 순서만 |
 | 옛 claude 가 `--effort` 말고 다른 새 옵션을 몰라도 조용히 헛돎 | 모르는 옵션이면 어느 옵션인지 `alerts.log` 에 올림 |
 | 프로젝트에서 고친 키트 파일이 저장소로 안 돌아옴 (이번 일의 원인) | 감독 규칙: 키트에서 온 파일을 고쳤으면 보고 끝에 "키트 저장소에도 올릴까요?" |
 
@@ -95,7 +96,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
 | `CLAUDE.md` | 모든 AI가 제일 먼저 읽는 한 장 |
 | `docs/conventions/` | 규칙 원문 (이름·폴더·코드·데이터·커밋·브랜치·버전·검사·INBOX·**자율 판단**·**레퍼런스 충실**·**플레이어 눈**) |
 | `docs/reference/` | 레퍼런스 시트 (화면·캐릭터마다 한 장 — 만들기 전에 쓰고, 캡처와 나란히 대조) |
-| `.claude/skills/` | `kickoff`(한마디→설계·로드맵), `new-script`, `new-content`, `commit`, `inbox`, `release` |
+| `.claude/skills/` | `kickoff`(한마디→설계·로드맵), `new-script`(코드), `new-content`(데이터), `new-visual`(보이는 것), `reference-sheet`(레퍼런스 시트·동작 관찰표), `commit`, `inbox`, `release` |
 | `.claude/agents/convention-checker.md` | 읽기 전용 규칙 점검 AI |
 | `.claude/settings.json` | 위험 명령 차단 (`git add -A`, `push --force`, `rm -rf` …) |
 | `.githooks/` | 커밋 메시지 형식·규칙 위반을 **커밋 순간에 막음** |
