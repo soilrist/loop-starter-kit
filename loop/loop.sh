@@ -11,6 +11,27 @@ ROOT="$(cd "$LOOP_DIR/.." && pwd)"
 cd "$ROOT" || exit 1
 mkdir -p logs
 
+# 라우터 별칭 함정 방지: 이 값들이 세팅돼 있으면 claude 가 지정 모델 대신 프록시 별칭으로 가서
+# 바퀴가 헛바퀴로 끝난다 (MechaVanguard 2026-09-23 바퀴 #25~#30 실측)
+ROUTER_ENV_UNSET=(-u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_BASE_URL \
+  -u ANTHROPIC_MODEL -u ANTHROPIC_DEFAULT_SONNET_MODEL -u ANTHROPIC_DEFAULT_OPUS_MODEL \
+  -u ANTHROPIC_DEFAULT_HAIKU_MODEL)
+
+# 가벼운 바퀴가 사람 설정에서 가져갈 것: 동작을 바꾸는 값(env·autoCompactWindow) + rtk 출력 줄이기 훅.
+# 왜: 이걸 빠뜨리면 컨텍스트 상한·자동 요약 기준이 풀려 바퀴가 220K 까지 불어난다 (Snarehaven #160 실측, 입력 2배).
+# 계정마다 설정 폴더가 다르므로 그 계정 것을 읽는다 (default = ~/.claude).
+lean_settings() {
+  python3 - "$1/settings.json" <<'PY'
+import json, shutil, sys
+try: u = json.load(open(sys.argv[1]))
+except Exception: u = {}
+s = {k: u[k] for k in ("env", "autoCompactWindow") if k in u}
+if shutil.which("rtk"):
+    s["hooks"] = {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "rtk hook claude"}]}]}
+print(json.dumps(s))
+PY
+}
+
 LOCK="$LOOP_DIR/.lock"
 if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK" 2>/dev/null)" 2>/dev/null; then
   echo "이미 돌고 있음 (pid $(cat "$LOCK"))"
@@ -34,6 +55,8 @@ if [ -f logs/usage.csv ] && ! head -n 1 logs/usage.csv | grep -q ',turns,'; then
   mv logs/usage.csv logs/usage-pre23.csv || exit 1
 fi
 [ -f logs/usage.csv ] || echo "time,lap,account,model,exit,commits,seconds,note,effort,turns,in_tok,out_tok,cache_read,cost_usd" > logs/usage.csv
+# 호출마다 모델이 받은 컨텍스트 크기 (가벼운 바퀴가 실제로 줄였는지 재는 숫자)
+[ -f logs/context.csv ] || echo "time,lap,first,peak,calls,input_total,output_total" > logs/context.csv
 LAP_FILE="logs/lap"
 [ "${LOOP_DRY_RUN:-0}" = "1" ] && LAP_FILE="logs/lap.dry"   # 시험 바퀴는 번호를 따로 셈
 [ -f "$LAP_FILE" ] || echo 0 > "$LAP_FILE"
@@ -73,7 +96,8 @@ nap() {
 }
 
 # 계정 한도 판정 — 문구는 자주 바뀌니 넓게 잡고, 최종 판단은 "커밋이 0개였나"와 합쳐서 한다 (아래)
-LIMIT_RE='usage.?limit|session limit|hit your|rate.?limit|limit.?reached|hit your limit|weekly limit|quota|credit balance|insufficient credit|out of credits|too many requests|overloaded|resets? at|billing|\b429\b|\b529\b'
+# 로그인 만료도 같이 본다 — 그 계정은 다시 로그인할 때까지 못 쓰니 다음 계정으로 넘긴다 (Snarehaven 10-03: 만료된 계정으로 바퀴가 5초씩 헛돌았다)
+LIMIT_RE='Failed to authenticate|OAuth session expired|OAuth token has expired|run /login|usage.?limit|session limit|hit your|rate.?limit|limit.?reached|hit your limit|weekly limit|quota|credit balance|insufficient credit|out of credits|too many requests|overloaded|resets? at|billing|\b429\b|\b529\b'
 
 idle=0
 count=0
@@ -150,6 +174,14 @@ while :; do
   [ -n "${LOOP_FALLBACK_MODEL:-}" ] && set -- "$@" --fallback-model "$LOOP_FALLBACK_MODEL"
   [ -n "${LOOP_MAX_BUDGET_USD:-}" ] && set -- "$@" --max-budget-usd "$LOOP_MAX_BUDGET_USD"
   [ -f "$LOOP_DIR/mcp.json" ] && set -- "$@" --mcp-config "$LOOP_DIR/mcp.json"
+  # 가벼운 바퀴 (LOOP_LEAN=1, 기본): 사람 전역 설정(개인 훅·전역 스킬·플러그인·전역 MCP)을 바퀴에 올리지 않는다.
+  # 프로젝트 .claude/ 설정·스킬·CLAUDE.md 는 그대로. MCP 는 loop/mcp.json 에 적은 것만.
+  # 왜: 바퀴 시작 컨텍스트 38~48K 중 절반이 루프가 안 쓰는 것이었다 → 모든 호출마다 다시 실림 (Snarehaven 실측).
+  # 그래서 일꾼이 써야 하는 스킬은 전역(~/.claude/skills)이 아니라 프로젝트 .claude/skills/ 에 둔다.
+  if [ "${LOOP_LEAN:-1}" = "1" ]; then
+    set -- "$@" --setting-sources project,local --strict-mcp-config \
+      --tools "${LOOP_TOOLS:-Bash,Read,Edit,Write,Glob,Grep,Skill,ToolSearch,Monitor,TaskStop,WebSearch,WebFetch}"
+  fi
   # shellcheck disable=SC2086
   set -- "$@" $LOOP_PERMISSION_FLAGS
 
@@ -169,10 +201,12 @@ while :; do
       echo "[DRY] $LOOP_CLAUDE_BIN $*" > "$out"
       rc=0
     elif [ "$acct" = "default" ]; then
-      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env -u CLAUDE_CONFIG_DIR "$LOOP_CLAUDE_BIN" "$@" > "$raw" 2> "$out"
+      lean=(); [ "${LOOP_LEAN:-1}" = "1" ] && lean=(--settings "$(lean_settings "$HOME/.claude")")
+      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env -u CLAUDE_CONFIG_DIR "${ROUTER_ENV_UNSET[@]}" "$LOOP_CLAUDE_BIN" "$@" ${lean[@]+"${lean[@]}"} > "$raw" 2> "$out"
       rc=$?
     else
-      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env CLAUDE_CONFIG_DIR="$acct" "$LOOP_CLAUDE_BIN" "$@" > "$raw" 2> "$out"
+      lean=(); [ "${LOOP_LEAN:-1}" = "1" ] && lean=(--settings "$(lean_settings "$acct")")
+      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env "${ROUTER_ENV_UNSET[@]}" CLAUDE_CONFIG_DIR="$acct" "$LOOP_CLAUDE_BIN" "$@" ${lean[@]+"${lean[@]}"} > "$raw" 2> "$out"
       rc=$?
     fi
     # 사람이 읽을 요약(.log) = stderr + 최종 답 + 실행한 명령 목록. 한도 문구 판정도 이 파일로.
@@ -201,10 +235,13 @@ while :; do
     [ -n "$spent" ] || spent=",,,,"
   fi
   echo "$(date '+%Y-%m-%d %H:%M:%S'),$lap,$used_account,$LOOP_MODEL,$rc,$commits/$work,$secs,$note,$effort,$spent" >> logs/usage.csv
+  [ "$LOOP_DRY_RUN" = "1" ] || echo "$(date '+%Y-%m-%d %H:%M:%S'),$lap,$(python3 "$LOOP_DIR/lap_audit.py" context "$raw" 2>/dev/null || echo 0,0,0,0,0)" >> logs/context.csv
   log "바퀴 #$lap 끝 — 종료코드 $rc, 커밋 $commits(일 $work), ${secs}초 ${note}"
   # 옛 claude 가 --effort 를 모르면 매 바퀴가 시작도 못 하고 끝난다 — 원인을 바로 알려 준다
   if [ "$LOOP_DRY_RUN" != "1" ] && grep -q "unknown option '--effort'" "$out" 2>/dev/null; then
     alert "claude 가 --effort 옵션을 모름 — claude 를 업데이트하거나 loop/env.sh 의 LOOP_EFFORT·LOOP_EFFORT_RETRY 를 비울 것"
+  elif [ "$LOOP_DRY_RUN" != "1" ] && grep -q "unknown option" "$out" 2>/dev/null; then
+    alert "claude 가 옵션을 모름: $(grep -o "unknown option '[^']*'" "$out" | head -n 1) — claude 를 업데이트할 것 (가벼운 바퀴 옵션이면 loop/env.sh 의 LOOP_LEAN=0 으로 임시 회피)"
   fi
 
   # STATUS 에 적힌 "통과(`인용`)" 이 실제 도구 출력에 있었는지 기계로 대조 (Verification.md 1 — jev 가 UNAVAILABLE 이어도 이건 돈다)

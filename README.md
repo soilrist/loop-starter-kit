@@ -1,4 +1,4 @@
-# 루프 스타터 키트 v2.4.0 (확정)
+# 루프 스타터 키트 v2.5.0 (확정)
 
 **"이거 만들어!" 한마디면 알아서 만들고, 정말 필요할 때만 물어보는 AI 개발팀**을 게임 프로젝트에 심는 키트예요.
 
@@ -62,7 +62,25 @@
 | 에디터가 죽은 채로 바퀴가 돌아 검사 전부 "못 함" | `env.sh` `LOOP_PREFLIGHT_CMD`: 바퀴 전에 싼 명령 하나로 확인, 실패하면 claude 를 부르지 않고 쉼 |
 | 수백 조각이 쌓인 뒤에야 "기본 조작이 안 된다" | 마일스톤 끝 `[!] 사람: 🎮 5분 해 보기`. **사람이 안 해 본 마일스톤이 2개 쌓이면 감독이 루프를 멈추고** 요청 (사람이 "그냥 계속"이라 하면 다시 켬) |
 
-**이미 돌던 프로젝트를 v2.4 로 올릴 때** (감독이 순서대로): ① `loop/ctl.sh wrapup` 으로 멈춤 ② 키트 파일 덮어쓰기(설치 규칙 2 — `loop/env.sh` 는 기존 값을 지키고 새 줄 `LOOP_EFFORT`·`LOOP_EFFORT_RETRY`·`LOOP_PREFLIGHT_CMD` 만 옮김) ③ `loop/ctl.sh size` → `loop/ctl.sh tidy` → `docs(status): 오래된 기록 보관` 커밋 ④ INBOX 의 `확인` 을 전부 검산해 닫고, 상시 규칙 줄을 `CLAUDE.md` 로 옮김 ⑤ `LOOP_PREFLIGHT_CMD` 를 이 프로젝트에 맞게 채움 ⑥ 다시 켬. ③을 건너뛰면 일꾼의 첫 STATUS 커밋이 훅에 거절된다 (거절 메시지가 `tidy` 를 안내한다).
+**이미 돌던 프로젝트를 v2.4 이상으로 올릴 때** (감독이 순서대로): ① `loop/ctl.sh wrapup` 으로 멈춤 ② 키트 파일 덮어쓰기(설치 규칙 2 — `loop/env.sh` 는 기존 값을 지키고 새 줄 `LOOP_EFFORT`·`LOOP_EFFORT_RETRY`·`LOOP_LEAN`·`LOOP_TOOLS`·`LOOP_PREFLIGHT_CMD` 만 옮김. **덮어쓰기 전에 프로젝트의 `loop/loop.sh`·`loop/lap_audit.py` 를 키트와 diff 해서, 프로젝트에서만 고친 줄이 있으면 먼저 키트에 올린다**) ③ `loop/ctl.sh size` → `loop/ctl.sh tidy` → `docs(status): 오래된 기록 보관` 커밋 ④ INBOX 의 `확인` 을 전부 검산해 닫고, 상시 규칙 줄을 `CLAUDE.md` 로 옮김 ⑤ `LOOP_PREFLIGHT_CMD` 를 이 프로젝트에 맞게 채움 ⑥ 다시 켬. ③을 건너뛰면 일꾼의 첫 STATUS 커밋이 훅에 거절된다 (거절 메시지가 `tidy` 를 안내한다).
+
+## v2.5 에서 바뀐 것 — 프로젝트에만 있던 것을 키트로 되돌려 넣음
+Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)가 이 저장소에 올라오지 않아, 저장소의 v2.3·v2.4 에는 그 내용이 빠져 있었다. v2.4 를 그대로 덮어썼다면 가벼운 바퀴가 사라졌을 것이다. **v2.5 = 저장소 v2.4 + 프로젝트의 v2.3.1 + 영상 레퍼런스.**
+| 빠져 있던 것 | 이제 |
+|---|---|
+| 바퀴가 사람 전역 설정(개인 훅·전역 스킬 20여 개·플러그인·전역 MCP)까지 싣고 시작 — 루프가 안 쓰는 것이 모든 호출마다 다시 실림 | **가벼운 바퀴** `LOOP_LEAN=1`(기본): `--setting-sources project,local --strict-mcp-config --tools <루프가 쓰는 12개>`. 프로젝트 `.claude/`·스킬·`CLAUDE.md` 는 그대로, 엔진 MCP 는 `loop/mcp.json` 에 적은 것만. `rtk` 가 있으면 출력 줄이기 훅만 다시 건다 |
+| 가벼운 바퀴가 사람 설정의 컨텍스트 상한·자동 요약 기준까지 끊어 바퀴가 220K 로 불어남 (Snarehaven #160) | 계정별 `settings.json` 의 `env`·`autoCompactWindow` 만 바퀴로 옮긴다 (`lean_settings`) |
+| 줄었는지 잴 숫자가 없음 | 바퀴마다 `logs/context.csv` 에 첫 호출·최대·호출 수·입력 합·출력 합. `loop/ctl.sh cost` 끝에 "바퀴 시작·최대 컨텍스트 평균" 한 줄 |
+| 셸에 프록시 변수(`ANTHROPIC_BASE_URL` 등)가 있으면 바퀴가 엉뚱한 모델로 가 헛바퀴 (MechaVanguard) | `loop.sh` 가 실행 직전에 그 변수 7개를 지운다 |
+| 로그인이 만료된 계정으로 바퀴가 5초씩 헛돎 (Snarehaven 10-03) | 한도 판정에 로그인 만료 문구 추가 → 다음 계정으로 넘어감 |
+| `확인` 줄에 STATUS 내용을 통째로 다시 적음 | `InboxFormat.md` 12: 2문장 이내 + 근거 위치 하나 |
+| 움직임(걷기·도구 쓰기)을 정지 캡처로만 대조 — "영상 보고 똑같이"가 사람 지시로만 있었음 | `Reference.md` 2-1 **동작 관찰표**: 감독이 레퍼런스 영상 프레임을 잘라 직접 보고 `영상 ID + 시각`·주기·자세를 표로. 못 본 칸은 `확인 못 함`. 전 품목 한 번에 |
+| 스킬이 코드(`new-script`)·데이터(`new-content`)뿐 — 정작 로드맵 조각의 절반 이상인 화면·모델·아이콘·동작에는 작업 카드가 없어, 일꾼이 규칙 문서 네 개를 알아서 찾아 읽어야 했음 | 스킬 **`new-visual`**(시트 → 만들기 → 게임 카메라 캡처 열어 대조 → 플레이어 눈) · **`reference-sheet`**(시트·동작 관찰표 만드는 순서와 프레임 자르는 명령). 규칙은 그대로 `Reference.md`·`PlayerEye.md` 에 있고 스킬은 순서만 |
+| 옛 claude 가 `--effort` 말고 다른 새 옵션을 몰라도 조용히 헛돎 | 모르는 옵션이면 어느 옵션인지 `alerts.log` 에 올림 |
+| 프로젝트에서 고친 키트 파일이 저장소로 안 돌아옴 (이번 일의 원인) | 감독 규칙: 키트에서 온 파일을 고쳤으면 보고 끝에 "키트 저장소에도 올릴까요?" |
+
+**이름이 겹치는 v2.3**: 프로젝트의 `docs/LOOP_KIT_README.md` 에 v2.3.1 이라고 적혀 있으면 그건 "가벼운 바퀴" 판이다. 이 저장소의 v2.3.0(비용 측정·노력 단계)과 다른 것이고, v2.5 에는 둘 다 들어 있다.
+**일꾼이 써야 하는 스킬은 프로젝트 `.claude/skills/` 에 둔다.** 가벼운 바퀴의 일꾼은 사람 전역 스킬(`~/.claude/skills`)을 못 본다. 영상 보기처럼 전역에만 있는 스킬은 감독(Code 탭 대화)만 쓴다.
 
 ## 확정된 규칙
 | 항목 | 정한 것 | 이유 |
@@ -78,7 +96,7 @@
 | `CLAUDE.md` | 모든 AI가 제일 먼저 읽는 한 장 |
 | `docs/conventions/` | 규칙 원문 (이름·폴더·코드·데이터·커밋·브랜치·버전·검사·INBOX·**자율 판단**·**레퍼런스 충실**·**플레이어 눈**) |
 | `docs/reference/` | 레퍼런스 시트 (화면·캐릭터마다 한 장 — 만들기 전에 쓰고, 캡처와 나란히 대조) |
-| `.claude/skills/` | `kickoff`(한마디→설계·로드맵), `new-script`, `new-content`, `commit`, `inbox`, `release` |
+| `.claude/skills/` | `kickoff`(한마디→설계·로드맵), `new-script`(코드), `new-content`(데이터), `new-visual`(보이는 것), `reference-sheet`(레퍼런스 시트·동작 관찰표), `commit`, `inbox`, `release` |
 | `.claude/agents/convention-checker.md` | 읽기 전용 규칙 점검 AI |
 | `.claude/settings.json` | 위험 명령 차단 (`git add -A`, `push --force`, `rm -rf` …) |
 | `.githooks/` | 커밋 메시지 형식·규칙 위반을 **커밋 순간에 막음** |
@@ -95,7 +113,7 @@
 압축을 풀어 둔 뒤, **프로젝트 폴더를 연 Code 탭 세션**에 아래를 그대로 붙여넣으세요.
 
 ```
-루프 스타터 키트 v2.4.0 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
+루프 스타터 키트 v2.5.0 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
 키트의 README.md "설치 규칙"을 먼저 읽고 그대로 따라 줘.
 끝나면 결과를 5줄로 보고하고, 내가 정해야 할 것만 모아서 물어봐.
 루프는 아직 켜지 마.
@@ -132,6 +150,7 @@
    - `python3 tools/check_conventions.py` 를 돌린다 (엔진 프로젝트가 하위 폴더면 `--root <폴더>`).
    - 기존 파일의 위반은 **지금 고치지 않는다.** 목록만 보여 주고, ROADMAP 맨 앞에 `M0-00 기존 파일 규칙 맞추기` 조각으로 넣는다. 파일 이동은 루프가 에디터·엔진 MCP 로 한다.
    - 7-1. **코드 그래프**: `command -v graphify` 가 있으면 `/graphify .` 로 `graphify-out/` 을 만들고 `.gitignore` 에 `/graphify-out/` 을 넣는다 (그래프는 커밋하지 않음). 없으면 이 단계는 건너뛰고 보고에 한 줄 적는다 — 루프는 그래프가 있을 때만 `graphify query` 를 쓴다. 갱신은 감독이 마일스톤 끝에 `/graphify . --update`.
+   - 7-2. **일꾼이 쓸 것은 프로젝트로**: 가벼운 바퀴의 일꾼은 사람 전역 스킬·플러그인·MCP 를 못 본다. ① 일꾼이 **엔진 MCP 로 일해야 하면**(예: Unity `unityMCP`) 그 서버 설정을 `loop/mcp.json` 에 적는다 — 루트 `.mcp.json` 과 `~/.claude.json` 것은 일꾼에게 안 간다. 명령줄·커맨드릿으로만 일하면 만들지 않는다. ② 전역(`~/.claude/skills`)의 엔진 스킬 중 **일꾼이 쓸 것만** 프로젝트 `.claude/skills/` 로 복사한다. 전부 넣지 않는다 — 스킬 목록은 모든 호출에 실린다. 감독만 쓰는 것(영상 보기 `watch` · 과설계 점검 · 그림 그리기)은 옮기지 않는다. ③ `CLAUDE.md` "프로젝트" 절의 "만드는 도구" 칸을 채운다. 확인은 `loop/ctl.sh status` 의 "일꾼 MCP" 줄.
 8. **루프 시험**
    - `loop/ctl.sh try` 로 claude 를 부르지 않는 시험 두 바퀴를 돌린다 (번호는 `logs/lap.dry` 에 따로 셈).
    - `logs/usage.csv` 에 `dry` 두 줄이 생겼는지 확인한다. `python3 loop/lap_audit.py selftest` 가 `SELFTEST_OK` 인지도 본다.
@@ -139,7 +158,7 @@
    - `command -v claude` 와 `~/.claude-loop-nc` 폴더가 있는지 확인해 보고한다.
    - `python3 tools/jev.py selftest` 가 `SELFTEST_OK` 인지 확인한다. `UNAVAILABLE` 이면 키·SDK(`~/.claude/scripts/.venv`) 문제 — 고치지 말고 보고만 (루프는 `통과(jev 미확인)` 로 돌 수 있음).
 9. **커밋**
-   - `chore(loop): 루프 스타터 키트 v2.4.0 설치` 로 커밋한다 (훅 통과 확인).
+   - `chore(loop): 루프 스타터 키트 v2.5.0 설치` 로 커밋한다 (훅 통과 확인).
    - 사람이 확인한 뒤에만 커밋한다.
 10. **보고**: 설치된 것 / 합친 파일 / 기존 위반 수 / 사람이 정할 것.
 

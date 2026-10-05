@@ -24,6 +24,14 @@ LOOP_FALLBACK_MODEL="opus"
 LOOP_EFFORT="medium"
 LOOP_EFFORT_RETRY="high"
 
+# 가벼운 바퀴: 1(기본)이면 사람 전역 설정(개인 훅·전역 스킬·플러그인·전역 MCP)을 바퀴에 싣지 않는다
+# 프로젝트 .claude/(스킬·설정)·CLAUDE.md 는 그대로, MCP 는 loop/mcp.json 에 적은 것만. 끄려면 0
+# 왜: 루프가 안 쓰는 전역 설정이 바퀴의 모든 호출마다 다시 실린다. 줄었는지는 logs/context.csv · `loop/ctl.sh cost` 로 본다
+# 주의: 일꾼이 써야 하는 스킬은 전역이 아니라 프로젝트 .claude/skills/ 에 둔다 (전역 것은 일꾼 눈에 안 보인다)
+LOOP_LEAN=1
+# 가벼운 바퀴에서 일꾼이 쓰는 기본 도구 (비우면 loop.sh 기본 12개). 엔진 MCP 도구는 여기 말고 loop/mcp.json
+LOOP_TOOLS=""
+
 # 바퀴 전 점검 명령 (비우면 건너뜀). 종료코드 0 이 아니면 그 바퀴는 claude 를 부르지 않고 쉰다
 # 엔진 에디터·MCP 가 살아 있는지처럼 "이게 죽어 있으면 바퀴가 통째로 헛도는 것" 하나를 싸게 확인하는 명령을 감독이 넣는다
 # 예) Unity 상주 에디터: 'pgrep -f "Unity.*-projectPath" >/dev/null'   예) 로컬 서버: 'curl -fsS localhost:8080/health >/dev/null'

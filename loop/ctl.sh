@@ -98,13 +98,20 @@ case "${1:-status}" in
     echo "실행 중   : ${pid:-아니오}"
     echo "STOP/WRAPUP: $( [ -f "$LOOP_DIR/STOP" ] && echo STOP ) $( [ -f "$LOOP_DIR/WRAPUP" ] && echo WRAPUP )"
     echo "마지막 바퀴: $(cat logs/lap 2>/dev/null || echo 0)"
-    echo "설정      : 모델 $LOOP_MODEL / 노력 ${LOOP_EFFORT:-기본}(막히면 ${LOOP_EFFORT_RETRY:-그대로}) / 쉬는 시간 ${LOOP_SLEEP_SEC}초 / 계정 $LOOP_ACCOUNTS"
+    echo "설정      : 모델 $LOOP_MODEL / 노력 ${LOOP_EFFORT:-기본}(막히면 ${LOOP_EFFORT_RETRY:-그대로}) / 쉬는 시간 ${LOOP_SLEEP_SEC}초 / 계정 $LOOP_ACCOUNTS / 가벼운 바퀴 $([ "${LOOP_LEAN:-1}" = "1" ] && echo 켬 || echo 끔)"
+    if [ "${LOOP_LEAN:-1}" = "1" ]; then
+      echo "일꾼 MCP  : $([ -f "$LOOP_DIR/mcp.json" ] && echo "loop/mcp.json 에 적힌 것만" || echo "없음 — 일꾼은 명령줄로만 일함 (엔진 MCP 를 써야 하면 loop/mcp.json 을 만든다. 루트 .mcp.json·전역 설정은 일꾼에게 안 감)")"
+    else
+      echo "일꾼 MCP  : 전역·프로젝트 설정 그대로 (가벼운 바퀴 끔)"
+    fi
     echo "--- 최근 바퀴"; tail -n 5 logs/usage.csv 2>/dev/null || echo "(없음)"
     echo "--- 경고";     tail -n 5 logs/alerts.log 2>/dev/null || echo "(없음)"
     ;;
   cost)
     cd "$ROOT" || exit 1
-    python3 "$LOOP_DIR/lap_audit.py" report logs/usage.csv "${2:-20}"
+    python3 "$LOOP_DIR/lap_audit.py" report logs/usage.csv "${2:-20}"; rc=$?
+    python3 "$LOOP_DIR/lap_audit.py" ctxreport logs/context.csv "${2:-20}"
+    exit $rc
     ;;
   size)
     cd "$ROOT" || exit 1

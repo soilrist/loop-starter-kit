@@ -1,4 +1,4 @@
-# CLAUDE.md — 이 저장소에서 일하는 모든 AI가 먼저 읽는 한 장 (키트 v2.4.0)
+# CLAUDE.md — 이 저장소에서 일하는 모든 AI가 먼저 읽는 한 장 (키트 v2.5.0)
 
 > **짧게 유지한다 (200줄 이내).** 규칙 원문은 여기 적지 않는다 — 아래 문서 목록에서 지금 하는 일에 맞는 문서 **하나만** 연다.
 > **규칙은 `docs/conventions/` 에만 적는다.** 이 파일·스킬·에이전트·PROMPT 와 내용이 다르면 **컨벤션 문서가 이긴다.**
@@ -6,6 +6,7 @@
 ## 프로젝트
 - 게임: 〔한 줄 소개〕 / 장르: 〔〕
 - 엔진: 〔Unity / Unreal / Godot〕 〔버전〕 · 렌더 〔URP 2D 등〕 · 엔진 프로젝트 위치 〔저장소 루트 / unity·unreal·godot/〕 — 엔진별 구체 규칙은 `docs/engines/<엔진>.md`
+- 그림·모델·소리 만드는 도구: 〔예: Blender 스크립트(`tools/blender/`) · ComfyUI · 없음〕 — 일꾼이 실제로 쓸 수 있는 것만 적는다 (전역 스킬·MCP 는 일꾼 눈에 안 보임 — 설치 규칙 7-2)
 - 설계서 `docs/DESIGN.md` · 진행 `docs/STATUS.md` · 순서 `docs/ROADMAP.md`
 - 사람의 지시: `docs/feedback/INBOX.md` (맨 위가 최우선)
 
@@ -61,6 +62,8 @@
 | `commit` | /commit, "커밋해줘" | 규칙대로 조각별 커밋 (직접 불렀을 때만 실행) |
 | `new-script` | /new-script, "스크립트 만들어줘" | 계획 → 작성 → 검사 |
 | `new-content` | /new-content, "몬스터/아이템 추가해줘" | SO 틀·데이터 에셋 추가, 숫자는 DESIGN §6 에 근거와 함께 |
+| `new-visual` | "〔화면·모델·동작〕 만들어/고쳐", "조잡해" | 시트 → 만들기 → 게임 카메라 캡처 열어 대조 → 플레이어 눈 |
+| `reference-sheet` | "영상 보고 똑같이", "원본이랑 달라" | 레퍼런스 시트·동작 관찰표 (영상 프레임을 직접 보고 숫자로) |
 | `inbox` | /inbox, "인박스에 적어줘" | INBOX 형식대로 지시·질문 추가 |
 | `release` | /release, "main 에 올리자" | 합치기 조건 확인 → CHANGELOG → 태그 (승인 필수) |
 
