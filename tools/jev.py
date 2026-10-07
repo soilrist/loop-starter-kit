@@ -6,6 +6,7 @@
       pass(기본) = "검사가 통과했다"는 주장 · fail = "일부러 깨서 검사가 잡았다"(역검증)는 주장
   python3 tools/jev.py noise    "<엔진>" "<Error: 로그 줄>"       → KNOWN_NOISE | NEEDS_REVIEW
   python3 tools/jev.py verdict  "<결함 설명 + 근거>"              → CONFIRMED | PLAUSIBLE | NOT_REAL
+  (evidence 만) Jev 를 못 쓰면 하이쿠 5.5 가 대타로 판정 → SUPPORTED_LITE (JEV_LITE=0 으로 끔)
   python3 tools/jev.py selftest                                   → 알려진 6개 사례로 자기 검사
 
 출력: JSON 한 줄 {"choice": ..., "p": ..., "model": ...}
@@ -25,10 +26,10 @@ try:
 except ImportError:
     if VENV_PY.exists() and pathlib.Path(sys.executable) != VENV_PY:
         os.execv(str(VENV_PY), [str(VENV_PY), *sys.argv])  # ponytail: SDK 는 ~/.claude 의 venv 하나에만
-    print(json.dumps({"choice": "UNAVAILABLE", "reason": "typesafe_sdk 없음"}))
-    sys.exit(2)
+    # SDK 가 없어도 죽지 않는다 — evidence 는 아래 하이쿠 대타가 받는다. 나머지는 _ask 가 UNAVAILABLE 로 알린다
+    Choice = Noul = TypeSafeClient = None
 
-POSITIVE = {"SUPPORTED", "KNOWN_NOISE", "CONFIRMED"}
+POSITIVE = {"SUPPORTED", "SUPPORTED_LITE", "KNOWN_NOISE", "CONFIRMED"}
 EVIDENCE_P = 0.7  # Noul 은 0.5 근처가 '모름' — 0.7 이상만 통과로 친다
 
 
@@ -42,7 +43,35 @@ def _api_key() -> str:
     ).stdout.strip()
 
 
+LITE_MODEL = os.environ.get("LOOP_LIGHT_MODEL", "claude-haiku-5-5")
+LITE_BIN = os.environ.get("LOOP_CLAUDE_BIN") or "claude"
+
+
+def _lite_evidence(claim: str, output: str, expect: str) -> dict:
+    """Jev 를 못 쓸 때(키·네트워크 없음)만 부르는 대타: 하이쿠 5.5 가 같은 질문에 yes/no 만 답한다.
+    Jev 보다 약한 판정이라 결과 이름이 다르다(SUPPORTED_LITE) — STATUS 에는 '통과(jev 미확인, lite 확인)' 로 적는다.
+    도구 없이(--tools "") 글만 판정하고, 변명을 못 쓰게 첫 단어 YES/NO 만 읽는다."""
+    prompt = (
+        EVIDENCE_INSTRUCTIONS[expect]
+        + "\n\nclaim:\n" + claim + "\n\ncited_output:\n" + output
+        + "\n\nAnswer with exactly one word on the first line: YES or NO."
+    )
+    r = subprocess.run(
+        [LITE_BIN, "-p", prompt, "--model", LITE_MODEL, "--effort", "low", "--tools", "",
+         "--setting-sources", "", "--strict-mcp-config"],
+        capture_output=True, text=True, timeout=120,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(f"lite rc={r.returncode}: {r.stderr.strip()[:120]}")
+    first = (r.stdout.strip().split() or [""])[0].strip(".,:").upper()
+    if first not in ("YES", "NO"):
+        raise RuntimeError(f"lite 답이 YES/NO 가 아님: {r.stdout.strip()[:60]!r}")
+    return {"choice": "SUPPORTED_LITE" if first == "YES" else "NOT_SUPPORTED", "p": None, "model": LITE_MODEL}
+
+
 def _ask(state, question):
+    if TypeSafeClient is None:
+        raise ImportError("typesafe_sdk 없음")
     with TypeSafeClient(api_key=_api_key()) as client:
         return client.system_one(state=state, questions={"q": question})
 
@@ -67,6 +96,8 @@ EVIDENCE_INSTRUCTIONS = {
 
 
 def evidence(claim: str, output: str, expect: str = "pass") -> dict:
+    if TypeSafeClient is None:
+        raise ImportError("typesafe_sdk 없음")
     if expect not in EVIDENCE_INSTRUCTIONS:
         raise ValueError(f"expect 는 pass|fail 중 하나: {expect!r}")
     r = _ask(
@@ -78,6 +109,8 @@ def evidence(claim: str, output: str, expect: str = "pass") -> dict:
 
 
 def noise(engine: str, line: str) -> dict:
+    if TypeSafeClient is None:
+        raise ImportError("typesafe_sdk 없음")
     r = _ask(
         {"engine": engine, "log_line": line},
         Choice(
@@ -95,6 +128,8 @@ def noise(engine: str, line: str) -> dict:
 
 
 def verdict(finding: str) -> dict:
+    if TypeSafeClient is None:
+        raise ImportError("typesafe_sdk 없음")
     r = _ask(
         {"finding": finding},
         Choice(
@@ -148,6 +183,15 @@ if __name__ == "__main__":
         print(json.dumps({"choice": "SELFTEST_FAIL", "cases": e.args[0]}, ensure_ascii=False))
         sys.exit(1)
     except Exception as e:  # 키 없음·네트워크·429 — 루프를 죽이지 않고 '미확인'으로
+        if cmd == "evidence" and os.environ.get("JEV_LITE", "1") == "1":  # Jev 대신 하이쿠가 한 번 더 (더 약한 판정)
+            try:
+                out = _lite_evidence(args[0], args[1], args[2] if len(args) > 2 else "pass")
+                print(json.dumps(out, ensure_ascii=False))
+                sys.exit(0 if out["choice"] == "SUPPORTED_LITE" else 1)
+            except SystemExit:
+                raise
+            except Exception as e2:
+                e = RuntimeError(f"{e} | lite: {e2}")
         print(json.dumps({"choice": "UNAVAILABLE", "reason": f"{type(e).__name__}: {e}"[:200]}, ensure_ascii=False))
         sys.exit(2)
     print(json.dumps(out, ensure_ascii=False))

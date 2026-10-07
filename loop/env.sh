@@ -16,6 +16,8 @@ LOOP_LAP_TIMEOUT_SEC=2400
 
 # 모델: 소넷 우선, 과부하 시 오퍼스 (claude --fallback-model)
 LOOP_MODEL="sonnet"
+# 잔심부름·Jev 대타용 가벼운 모델 (감독의 확인 줄 닫기·정리·요약, tools/jev.py 의 lite 판정). 일꾼에는 쓰지 않는다
+LOOP_LIGHT_MODEL="claude-haiku-5-5"
 LOOP_FALLBACK_MODEL="opus"
 
 # 노력 단계 (claude --effort): low / medium / high / xhigh / max. 비우면 claude 기본값
