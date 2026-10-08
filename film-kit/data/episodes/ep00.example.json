@@ -1,0 +1,10 @@
+{
+  "id": "ep00",
+  "title": "예시 에피소드 (복사해서 쓰고 이 파일은 지운다)",
+  "platform": "shorts",
+  "hook": "대장장이가 마지막 망치를 든다",
+  "shots": [
+    {"id": "s01", "sec": 3, "visual": "새벽 대장간, 대장장이가 낡은 망치를 든다 (characters.smith)", "audio": "narration: 이것이 마지막 작품이다", "subtitle": "이것이 마지막 작품이다"},
+    {"id": "s02", "sec": 4, "visual": "불꽃이 튀는 쇠 클로즈업", "audio": "sfx: 망치 소리", "subtitle": ""}
+  ]
+}

@@ -1,0 +1,12 @@
+# 큰 파일은 git 밖. 일꾼은 경로·해시만 STATUS 에 적는다
+work/
+captures/tmp/
+logs/
+loop/STOP
+loop/WRAPUP
+loop/gpu.lock
+*.mp4
+*.mov
+*.wav
+*.safetensors
+!publish/**/final.mp4
