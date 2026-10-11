@@ -45,6 +45,13 @@ LOOP_MAX_BUDGET_USD=""
 # 팀 계정 폴더가 없으면 자동으로 건너뜀
 LOOP_ACCOUNTS="$HOME/.claude-loop-nc default"
 
+# 구독 한도 폴백: 위 계정이 전부 "사용량 한도"일 때만 Anthropic API 키로 그 바퀴를 한 번 더 돈다 (다음 바퀴는 다시 구독부터)
+# 키는 깃에 넣지 않는다. 키 한 줄만 든 파일(아래 경로) 또는 환경변수 FALLBACK_ANTHROPIC_API_KEY. 둘 다 없으면 예전처럼 쉰다
+# ANTHROPIC_API_KEY 라는 이름은 쓰지 않는다 — 늘 세팅돼 있으면 claude 가 구독 대신 API 로 먼저 돈다
+LOOP_API_KEY_FILE="$HOME/.claude-loop-api-key"
+# API 바퀴 한 번의 비용 상한(달러, 비우면 LOOP_MAX_BUDGET_USD 만 적용)
+LOOP_API_MAX_BUDGET_USD=""
+
 # 헛바퀴(커밋 0) 연속 몇 번이면 경고 / 그 두 배면 스스로 멈춤
 LOOP_MAX_IDLE=3
 LOOP_IDLE_SLEEP_SEC=3600
