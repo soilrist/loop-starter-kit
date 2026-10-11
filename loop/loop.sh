@@ -97,6 +97,8 @@ nap() {
 
 # 계정 한도 판정 — 문구는 자주 바뀌니 넓게 잡고, 최종 판단은 "커밋이 0개였나"와 합쳐서 한다 (아래)
 # 로그인 만료도 같이 본다 — 그 계정은 다시 로그인할 때까지 못 쓰니 다음 계정으로 넘긴다 (Snarehaven 10-03: 만료된 계정으로 바퀴가 5초씩 헛돌았다)
+# 그중 "구독 사용량 한도"만 — 이때만 API 키로 넘어간다 (로그인 만료·서버 과부하는 API 로 넘겨도 소용없거나 사람이 고칠 일)
+USAGE_RE='usage.?limit|session limit|hit your|rate.?limit|limit.?reached|weekly limit|resets? at|out of credits|\b429\b'
 LIMIT_RE='Failed to authenticate|OAuth session expired|OAuth token has expired|run /login|usage.?limit|session limit|hit your|rate.?limit|limit.?reached|hit your limit|weekly limit|quota|credit balance|insufficient credit|out of credits|too many requests|overloaded|resets? at|billing|\b429\b|\b529\b'
 
 idle=0
@@ -189,6 +191,7 @@ while :; do
   rc=0
   note=""
   all_limited=1
+  usage_limited=0
   log "바퀴 #$lap 시작 (모델 $LOOP_MODEL, 노력 ${effort:-기본})"
 
   for acct in $LOOP_ACCOUNTS; do
@@ -216,11 +219,35 @@ while :; do
     if [ "$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)" = "0" ] && grep -Eiq "$LIMIT_RE" "$out"; then
       log "계정 $used_account 한도 → 다음 계정 (rc=$rc)"
       note="limit:$used_account"
+      grep -Eiq "$USAGE_RE" "$out" && usage_limited=1
       continue
     fi
     all_limited=0
     break
   done
+
+  # 구독 계정이 전부 사용량 한도일 때만 API 키로 이 바퀴를 한 번 더 (키가 없으면 예전처럼 쉰다)
+  # 키 이름을 ANTHROPIC_API_KEY 로 두지 않는 이유: 그 이름이 늘 세팅돼 있으면 claude -p 가 구독보다 API 키를 먼저 써서 평소에도 돈이 나간다
+  # launchd 는 셸 환경변수를 넘기지 않으므로 파일($LOOP_API_KEY_FILE)에서도 읽는다
+  api_key="${FALLBACK_ANTHROPIC_API_KEY:-}"
+  [ -z "$api_key" ] && [ -f "${LOOP_API_KEY_FILE:-}" ] && api_key="$(tr -d ' \r\n' < "$LOOP_API_KEY_FILE")"
+  if [ "$LOOP_DRY_RUN" != "1" ] && [ "$all_limited" = "1" ] && [ "$usage_limited" = "1" ] && [ -n "$api_key" ]; then
+    used_account="api"
+    log "구독 한도 → API 키로 다시 (이 바퀴만, 다음 바퀴는 다시 구독부터)"
+    lean=(); [ "${LOOP_LEAN:-1}" = "1" ] && lean=(--settings "$(lean_settings "$HOME/.claude")")
+    budget=(); [ -n "${LOOP_API_MAX_BUDGET_USD:-}" ] && budget=(--max-budget-usd "$LOOP_API_MAX_BUDGET_USD")
+    run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env -u CLAUDE_CONFIG_DIR "${ROUTER_ENV_UNSET[@]}" ANTHROPIC_API_KEY="$api_key" "$LOOP_CLAUDE_BIN" "$@" ${lean[@]+"${lean[@]}"} ${budget[@]+"${budget[@]}"} > "$raw" 2> "$out"
+    rc=$?
+    python3 "$LOOP_DIR/lap_audit.py" render "$raw" >> "$out" 2>&1
+    if [ "$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)" = "0" ] && grep -Eiq "$LIMIT_RE" "$out"; then
+      log "API 키도 한도·오류 (rc=$rc)"
+      note="${note} limit:api"
+    else
+      note="${note} api"
+      all_limited=0
+    fi
+  fi
+  unset api_key
 
   secs=$(( $(date +%s) - started ))
   commits="$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)"
@@ -274,7 +301,7 @@ while :; do
   fi
 
   if [ "$LOOP_DRY_RUN" != "1" ] && [ "$all_limited" = "1" ]; then
-    alert "모든 계정이 한도 — ${LOOP_LIMIT_SLEEP_SEC}초 쉼"
+    alert "모든 계정(있으면 API 키까지) 한도 — ${LOOP_LIMIT_SLEEP_SEC}초 쉼"
     nap "$LOOP_LIMIT_SLEEP_SEC"
     continue
   fi
