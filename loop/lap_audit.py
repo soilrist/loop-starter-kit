@@ -123,7 +123,8 @@ def saw_image(events):
     """이번 바퀴에 그림을 실제로 열어 봤나 — Read 로 그림 파일을 열었거나, 도구 결과에 그림이 들어 있었나"""
     for ev in events:
         t = ev.get("type")
-        content = (ev.get("message") or {}).get("content")
+        m = ev.get("message")
+        content = m.get("content") if isinstance(m, dict) else None
         if not isinstance(content, list):
             continue
         for b in content:
@@ -334,7 +335,9 @@ def context_fields(events):
     """호출마다 모델이 받은 컨텍스트(입력+캐시) — 같은 message.id 는 한 번만 센다 (한 호출이 여러 줄로 나뉘어 기록된다)"""
     seen, sizes, out = set(), [], 0
     for ev in events:
-        m = ev.get("message") or {}
+        m = ev.get("message")
+        if not isinstance(m, dict):
+            continue
         u, mid = m.get("usage"), m.get("id")
         if ev.get("type") != "assistant" or not u or mid in seen:
             continue
@@ -474,6 +477,7 @@ def selftest():
     tool_img = [{"type": "user", "message": {"content": [{"type": "tool_result", "content": [{"type": "image", "source": {}}]}]}}]
     read_txt = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "docs/STATUS.md"}}]}}]
     assert saw_image(read_img) and saw_image(tool_img) and not saw_image(read_txt), "그림을 열었는지 판정이 틀림"
+    assert not saw_image([{"type": "user", "message": "글자뿐인 메시지"}]), "message 가 글자일 때 죽으면 안 됨"
     assert eye_claim_without_look(["검사: 1층 통과 / 3층 통과(레퍼런스 대조: docs/reference/inv.md)"], False)
     assert not eye_claim_without_look(["검사: 1층 통과 / 3층 통과(레퍼런스 대조: docs/reference/inv.md)"], True)
     assert not eye_claim_without_look(["검사: 1층 통과 / 3층 못 함(에디터 꺼짐)"], False), "못 함을 지적함"

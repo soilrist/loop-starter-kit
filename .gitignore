@@ -93,6 +93,7 @@ __pycache__/
 /loop/STOP
 /loop/WRAPUP
 /loop/.lock
+/loop/HOLD
 /captures/tmp/
 # AI 이미지 생성 원본(대용량) — 고른 것만 Assets 로 옮긴다
 /_Source/raw/

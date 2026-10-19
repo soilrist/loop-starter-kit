@@ -1,4 +1,4 @@
-# 루프 스타터 키트 v2.5.0 (확정)
+# 루프 스타터 키트 v2.6.0 (확정)
 
 **"이거 만들어!" 한마디면 알아서 만들고, 정말 필요할 때만 물어보는 AI 개발팀**을 게임 프로젝트에 심는 키트예요.
 
@@ -64,6 +64,21 @@
 
 **이미 돌던 프로젝트를 v2.4 이상으로 올릴 때** (감독이 순서대로): ① `loop/ctl.sh wrapup` 으로 멈춤 ② 키트 파일 덮어쓰기(설치 규칙 2 — `loop/env.sh` 는 기존 값을 지키고 새 줄 `LOOP_EFFORT`·`LOOP_EFFORT_RETRY`·`LOOP_LEAN`·`LOOP_TOOLS`·`LOOP_PREFLIGHT_CMD` 만 옮김. **덮어쓰기 전에 프로젝트의 `loop/loop.sh`·`loop/lap_audit.py` 를 키트와 diff 해서, 프로젝트에서만 고친 줄이 있으면 먼저 키트에 올린다**) ③ `loop/ctl.sh size` → `loop/ctl.sh tidy` → `docs(status): 오래된 기록 보관` 커밋 ④ INBOX 의 `확인` 을 전부 검산해 닫고, 상시 규칙 줄을 `CLAUDE.md` 로 옮김 ⑤ `LOOP_PREFLIGHT_CMD` 를 이 프로젝트에 맞게 채움 ⑥ 다시 켬. ③을 건너뛰면 일꾼의 첫 STATUS 커밋이 훅에 거절된다 (거절 메시지가 `tidy` 를 안내한다).
 
+## v2.6 에서 바뀐 것 — Snarehaven 에서 v2.5 를 4주 돌리며 고친 것
+| 넘어진 곳 | 이제 |
+|---|---|
+| 감독이 검수하려고 루프를 세워 두고 잊음 → 몇 시간 일 0 (「왜 자꾸 루프를 끄냐」) | **`loop/watchdog.sh`**: `ctl.sh on` 이 15분 감시를 같이 등록. 꺼져 있는데 INBOX 에 루프 몫이 남았으면 다시 켬. 일부러 세울 땐 `off`·`wrapup`·`kill` 이 `loop/HOLD` 를 남겨 감시가 건드리지 않음. `status` 에 감시 상태 |
+| 일꾼이 「감독 확인 대기」를 막힘으로 보고 할 일 0 으로 멈춤 | `PROMPT.md` ②-4: 감독 확인 대기는 막힘이 아니다 — 다음 조각으로 |
+| 3층 캡처를 「PIE·로그인 필요 → 감독 몫」으로 넘겨 루프 몫이 0 (두 번) | `PROMPT.md` 3층: 일꾼이 헤드리스 캡처 + 검사 스위치로 직접 찍는다. 「못 함(감독)」은 실기기 손 감각·실결제·사람 계정뿐, 넘긴 바퀴는 `결함` 으로 되돌림. `InboxFormat.md` 13: 삭제 조건을 「감독 캡처」로 쓰지 않음 |
+| 시험을 파일 끝 `#endif` 뒤에 붙여 에디터는 통과·출시(Shipping) 빌드만 컴파일 오류 | `check_conventions.py` **R16** (Unreal) |
+| 레퍼런스를 「완벽 복제」 하다 보니 화면이 원작과 너무 똑같아짐 — 소송 위험 | `Reference.md` 6절 **놀이는 따르고 겉모습은 다르게**: 따를 것/다르게 할 것 표, 보이는 조각마다 「다른 점 3」, 시트 숫자는 목표가 아니라 범위 |
+| 캡처를 여러 번 다시 찍느라 바퀴가 사라짐 · 숫자로만 확인한 동작을 합격 처리 · 오류를 "늘 나오는 것"으로 넘김 | `Verification.md` 12~14 |
+| UI 겹침 시험이 자리 계산 함수만 봐서 통과 — 실제 화면은 겹침 | `Verification.md` 15: 실제 배치된 위젯 사각형으로 「겹침 0 · 화면 밖 0」 + 역검증 |
+| Unreal: 락 파일 함정이 틀림 · 크래시 리포터 대화상자가 사람 화면에 쌓임 · 루프 게임 창이 사람 화면에 떠 진짜 플레이로 착각 · 콜드 셰이더 캐시를 정지로 오판 | `docs/checks/unreal.md` 알려진 함정 고침·추가 (절대경로·종료코드 1·`bSendUnattendedBugReports=False`·`-RenderOffscreen`·검사 스위치는 도우미 하나로, Shipping 에서 닫힘) |
+| `lap_audit.py` 가 글자뿐인 message 에서 죽음 | `isinstance` 로 막고 자체검사 추가 |
+
+**v2.5 → v2.6 올리기**: 위 파일을 덮어쓰고 `loop/ctl.sh on` 한 번 (감시 등록). `.gitignore` 에 `/loop/HOLD` 추가.
+
 ## v2.5 에서 바뀐 것 — 프로젝트에만 있던 것을 키트로 되돌려 넣음
 Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)가 이 저장소에 올라오지 않아, 저장소의 v2.3·v2.4 에는 그 내용이 빠져 있었다. v2.4 를 그대로 덮어썼다면 가벼운 바퀴가 사라졌을 것이다. **v2.5 = 저장소 v2.4 + 프로젝트의 v2.3.1 + 영상 레퍼런스.**
 | 빠져 있던 것 | 이제 |
@@ -85,7 +100,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
 ## 확정된 규칙
 | 항목 | 정한 것 | 이유 |
 |---|---|---|
-| 레퍼런스 | 주 레퍼런스 1개 고정, 구조·콘텐츠·UI 흐름은 그대로, 에셋 원본·이름은 새로 — `docs/conventions/Reference.md` | 기준이 구체적일수록 결과가 좋다 |
+| 레퍼런스 | 주 레퍼런스 1개 고정, 놀이(구조·콘텐츠·조작 흐름)·품질은 따르고 겉모습(배치·모양·색·얼굴·글·이름)은 다르게 — `docs/conventions/Reference.md` | 기준이 구체적일수록 결과가 좋다 |
 | 커밋 | `feat(combat): 3연타 추가` + 꼬리말 `Loop:` `Checks:` `Slice:` | 훅이 형식·바퀴 번호·검사 기록까지 기계로 검증, 조각별 추적 |
 | 에셋 이름 | 접두어 방식 (예 Unity `SPR_Player_Hero_Run_01`) — 엔진별 구체 규칙은 `docs/engines/<엔진>.md` | 이름이 ID처럼 검색됨 |
 | 코드 이름 | 엔진별 공식 가이드 (Unity `m_`/`k_`/`s_`, Unreal `b`/PascalCase, Godot snake_case) — `docs/engines/<엔진>.md` | 각 엔진 커뮤니티가 이미 읽을 줄 아는 규칙 |
@@ -102,7 +117,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
 | `.githooks/` | 커밋 메시지 형식·규칙 위반을 **커밋 순간에 막음** |
 | `tools/check_conventions.py` | 이름·엔진별 사이드카 파일·코드 접두어·안 채운 숫자·레퍼런스 시트 유무 자동 검사 (점검한 규칙 목록 출력) |
 | `tools/jev.py` | Jev(TypeSafe System One) 제3 판정기 — `evidence`(통과 인용이 진짜인가) · `noise`(엔진 에러 줄이 잡음인가) · `verdict`(결함 지적이 진짜인가) · `selftest`. 키는 Keychain `typesafe-api-key` 또는 `TYPESAFE_API_KEY` |
-| `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기), `lap_audit.py`(바퀴 기록 렌더·STATUS 인용 대조·눈 검사 대조·턴/토큰/추정비용 집계·문서 크기 점검과 보관) |
+| `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기)·`watchdog.sh`(꺼진 루프 감시), `lap_audit.py`(바퀴 기록 렌더·STATUS 인용 대조·눈 검사 대조·턴/토큰/추정비용 집계·문서 크기 점검과 보관) |
 | `evals/` · `.claude-plugin/` | 키트 자체 시험용 (`claude plugin eval`) — **프로젝트에는 복사하지 않음** |
 | `docs/DESIGN.md` `ROADMAP.md` `STATUS.md` `feedback/INBOX.md` | 기획서·조각 목록·바퀴 기록·우편함 |
 | `docs/templates/` | 기능 명세·버그·결정·사고기록 양식 |
@@ -113,7 +128,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
 압축을 풀어 둔 뒤, **프로젝트 폴더를 연 Code 탭 세션**에 아래를 그대로 붙여넣으세요.
 
 ```
-루프 스타터 키트 v2.5.0 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
+루프 스타터 키트 v2.6.0 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
 키트의 README.md "설치 규칙"을 먼저 읽고 그대로 따라 줘.
 끝나면 결과를 5줄로 보고하고, 내가 정해야 할 것만 모아서 물어봐.
 루프는 아직 켜지 마.
@@ -158,7 +173,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
    - `command -v claude` 와 `~/.claude-loop-nc` 폴더가 있는지 확인해 보고한다.
    - `python3 tools/jev.py selftest` 가 `SELFTEST_OK` 인지 확인한다. `UNAVAILABLE` 이면 키·SDK(`~/.claude/scripts/.venv`) 문제 — 고치지 말고 보고만 (루프는 `통과(jev 미확인)` 로 돌 수 있음).
 9. **커밋**
-   - `chore(loop): 루프 스타터 키트 v2.5.0 설치` 로 커밋한다 (훅 통과 확인).
+   - `chore(loop): 루프 스타터 키트 v2.6.0 설치` 로 커밋한다 (훅 통과 확인).
    - 사람이 확인한 뒤에만 커밋한다.
 10. **보고**: 설치된 것 / 합친 파일 / 기존 위반 수 / 사람이 정할 것.
 
