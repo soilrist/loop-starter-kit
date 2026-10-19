@@ -159,6 +159,7 @@ RULES = {
     "R13": "AssetNaming - AI 생성 에셋 라이선스 기록(_Source/LICENSES.md)",
     "R14": "CodingStyle - 필드 접두어 (m_ 멤버 · k_ 상수 · s_ 스태틱, Unity 공식) [Unity(C#) 전용]",
     "R15": "Reference - Art/UI 에셋이 있으면 레퍼런스 시트(docs/reference/*.md)가 있어야 함",
+    "R16": "CodingStyle - 자동 시험은 #if WITH_DEV_AUTOMATION_TESTS 안에 (밖이면 Shipping 빌드가 깨진다) [Unreal 전용]",
 }
 
 
@@ -481,6 +482,20 @@ def run(repo: Path, content_dirs: list[Path], only: set[Path] | None, profile: d
         rep.checked.add("R15")
         if not any((repo / "docs" / "reference").glob("*.md")):
             rep.warn("R15", "docs/reference/", "Art/UI 에셋이 있는데 레퍼런스 시트가 없음 — 대충 비슷하게 만든 흔적")
+
+    # 시험이 #endif 뒤에 붙으면 에디터 빌드는 되고 Shipping(출시) 빌드만 깨진다 (Snarehaven 2026-10-14)
+    for source in [p.parent / "Source" for p in [*repo.glob("*.uproject"), *repo.glob("*/*.uproject")]]:
+        if not source.is_dir():
+            continue
+        rep.checked.add("R16")
+        for f in source.rglob("*.cpp"):
+            lines = f.read_text(encoding="utf-8", errors="ignore").split("\n")
+            if not any("WITH_DEV_AUTOMATION_TESTS" in l for l in lines):
+                continue
+            imp = [i for i, l in enumerate(lines) if "IMPLEMENT_" in l and "AUTOMATION_TEST" in l]
+            ends = [i for i, l in enumerate(lines) if l.startswith("#endif")]
+            if imp and (not ends or imp[-1] > ends[-1]):
+                rep.err("R16", f"{f.relative_to(repo).as_posix()}:{imp[-1] + 1}", "자동 시험이 #if WITH_DEV_AUTOMATION_TESTS 밖 — #endif 를 파일 끝으로")
 
     for rid in RULES:
         if rid not in rep.checked and rid not in rep.not_checked:

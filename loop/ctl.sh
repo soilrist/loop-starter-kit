@@ -1,10 +1,11 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
 # 루프 스위치 — 사람은 직접 안 써도 됨. 감독에게 "켜/꺼/상태" 라고 말하면 감독이 실행
-#   on      루프 켜기 (launchd 등록, 로그인해도 자동 시작)
+#   on      루프 켜기 (launchd 등록, 로그인해도 자동 시작) + 감시(watchdog.sh, 15분) 등록
 #   wrapup  하던 조각 마무리하고 멈추기 (권장)
 #   off     다음 바퀴부터 멈추기 (진행 중인 바퀴는 끝까지)
-#   kill    지금 즉시 강제 종료 + launchd 해제
+#   kill    지금 즉시 강제 종료 + launchd·감시 해제
+#   (off·wrapup·kill 은 loop/HOLD 를 남겨 감시가 다시 켜지 않게 한다. on 이 지운다)
 #   status  상태 보기
 #   cost    최근 20바퀴의 "일한 바퀴 하나당" 턴·토큰·추정비용 (cost 50 처럼 바퀴 수 지정 가능)
 #   size    매 바퀴 다시 읽히는 문서(STATUS "지금 상태"·INBOX)가 한도를 넘었는지
@@ -18,6 +19,8 @@ ROOT="$(cd "$LOOP_DIR/.." && pwd)"
 . "$LOOP_DIR/env.sh"
 PLIST="$HOME/Library/LaunchAgents/${LOOP_LABEL}.plist"
 UID_NUM="$(id -u)"
+WD_LABEL="${LOOP_LABEL}-watchdog"
+WD_PLIST="$HOME/Library/LaunchAgents/${WD_LABEL}.plist"
 
 write_plist() {
   mkdir -p "$HOME/Library/LaunchAgents" "$ROOT/logs"
@@ -42,6 +45,26 @@ write_plist() {
 PL
 }
 
+# 감시: 루프가 꺼져 있는데 INBOX 에 루프 몫이 남았으면 다시 켠다 (loop/watchdog.sh)
+write_watchdog() {
+  cat > "$WD_PLIST" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>${WD_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>${LOOP_DIR}/watchdog.sh</string></array>
+  <key>WorkingDirectory</key><string>${ROOT}</string>
+  <key>StartInterval</key><integer>900</integer>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>${PATH}</string></dict>
+</dict>
+</plist>
+PL
+  launchctl print "gui/$UID_NUM/$WD_LABEL" >/dev/null 2>&1 || launchctl bootstrap "gui/$UID_NUM" "$WD_PLIST" 2>/dev/null || true
+}
+
 running_pid() {
   if [ -f "$LOOP_DIR/.lock" ] && kill -0 "$(cat "$LOOP_DIR/.lock")" 2>/dev/null; then cat "$LOOP_DIR/.lock"; fi
 }
@@ -55,8 +78,9 @@ case "${1:-status}" in
     cd "$ROOT" || exit 1
     [ "$(git config core.hooksPath)" = ".githooks" ] || { echo "✖ 훅 미설치: git config core.hooksPath .githooks"; exit 1; }
     if [ -n "$(running_pid)" ]; then
-      echo "✔ 이미 돌고 있음 (pid $(running_pid)) — STOP/WRAPUP 표시만 지움"
-      rm -f "$LOOP_DIR/STOP" "$LOOP_DIR/WRAPUP"
+      echo "✔ 이미 돌고 있음 (pid $(running_pid)) — STOP/WRAPUP/HOLD 표시만 지움"
+      rm -f "$LOOP_DIR/STOP" "$LOOP_DIR/WRAPUP" "$LOOP_DIR/HOLD"
+      write_watchdog
       exit 0
     fi
     # 루프 자신의 상태 파일(loop/·logs/·captures/tmp/ 의 추적 안 되는 파일)은 "커밋 안 된 변경"이 아니다 — 재시작을 스스로 막던 원인
@@ -66,8 +90,9 @@ case "${1:-status}" in
       if git show-ref --verify --quiet refs/heads/develop; then git checkout -q develop || exit 1; echo "✔ develop 로 이동"
       else git checkout -q -b develop || exit 1; echo "✔ develop 브랜치를 만들어 이동"; fi
     fi
-    rm -f "$LOOP_DIR/STOP" "$LOOP_DIR/WRAPUP"
+    rm -f "$LOOP_DIR/STOP" "$LOOP_DIR/WRAPUP" "$LOOP_DIR/HOLD"
     write_plist
+    write_watchdog
     if launchctl print "gui/$UID_NUM/$LOOP_LABEL" >/dev/null 2>&1; then
       launchctl bootout "gui/$UID_NUM/$LOOP_LABEL" 2>/dev/null || true
       for _ in 1 2 3 4 5 6 7 8 9 10; do
@@ -78,16 +103,17 @@ case "${1:-status}" in
     launchctl bootstrap "gui/$UID_NUM" "$PLIST" && echo "✔ 켜짐: $LOOP_LABEL (쉬는 시간 ${LOOP_SLEEP_SEC}초)"
     ;;
   wrapup)
-    touch "$LOOP_DIR/WRAPUP"
+    touch "$LOOP_DIR/WRAPUP" "$LOOP_DIR/HOLD"
     echo "✔ 마무리 요청 — 다음 바퀴가 하던 조각을 끝내고 멈춤"
     ;;
   off)
-    touch "$LOOP_DIR/STOP"
+    touch "$LOOP_DIR/STOP" "$LOOP_DIR/HOLD"
     echo "✔ 멈춤 요청 — 진행 중인 바퀴가 끝나면 멈춤"
     ;;
   kill)
-    touch "$LOOP_DIR/STOP"
+    touch "$LOOP_DIR/STOP" "$LOOP_DIR/HOLD"
     launchctl bootout "gui/$UID_NUM/$LOOP_LABEL" 2>/dev/null || true
+    launchctl bootout "gui/$UID_NUM/$WD_LABEL" 2>/dev/null || true
     pid="$(running_pid)"; [ -n "$pid" ] && pkill -TERM -P "$pid" 2>/dev/null; [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null
     echo "✔ 강제 종료 + launchd 해제"
     ;;
@@ -97,6 +123,7 @@ case "${1:-status}" in
     echo "라벨      : $LOOP_LABEL"
     echo "실행 중   : ${pid:-아니오}"
     echo "STOP/WRAPUP: $( [ -f "$LOOP_DIR/STOP" ] && echo STOP ) $( [ -f "$LOOP_DIR/WRAPUP" ] && echo WRAPUP )"
+    echo "감시      : $(launchctl print "gui/$UID_NUM/$WD_LABEL" >/dev/null 2>&1 && echo 켬 || echo 꺼짐)$( [ -f "$LOOP_DIR/HOLD" ] && echo " (HOLD — 일부러 세움)")"
     echo "마지막 바퀴: $(cat logs/lap 2>/dev/null || echo 0)"
     echo "설정      : 모델 $LOOP_MODEL / 노력 ${LOOP_EFFORT:-기본}(막히면 ${LOOP_EFFORT_RETRY:-그대로}) / 쉬는 시간 ${LOOP_SLEEP_SEC}초 / 계정 $LOOP_ACCOUNTS / 가벼운 바퀴 $([ "${LOOP_LEAN:-1}" = "1" ] && echo 켬 || echo 끔)"
     if [ "${LOOP_LEAN:-1}" = "1" ]; then
