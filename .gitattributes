@@ -75,3 +75,8 @@
 *.uasset filter=lfs diff=lfs merge=lfs -text
 *.umap   filter=lfs diff=lfs merge=lfs -text
 #LFS-END
+
+# 윈도우에서 CRLF 로 풀리면 훅이 깨지고 버전 읽기가 틀어진다 (v3.0)
+.githooks/*      text eol=lf
+loop/KIT_VERSION text eol=lf
+loop/*.txt       text eol=lf

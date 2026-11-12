@@ -1,5 +1,5 @@
 #!/bin/bash
-# 루프 감시 — launchd 가 15분마다 부른다 (ctl.sh on 이 등록).
+# 루프 감시 — 15분마다 불린다 (ctl.sh on 이 등록: macOS launchd / Windows 작업 스케줄러).
 # 루프가 꺼져 있는데 INBOX 에 루프 몫(결함·지시·답·보정·철회 열린 줄)이 남았으면 다시 켠다.
 # 왜: 감독이 검수하느라 세워 두고 잊으면 그동안 일이 0 이 된다 (Snarehaven 2026-10-16 「왜 자꾸 루프를 끄냐」).
 # 사람이 일부러 세울 땐 ctl.sh off·wrapup·kill — loop/HOLD 가 생겨 감시가 건드리지 않는다.

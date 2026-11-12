@@ -1,8 +1,8 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
 # 루프 일꾼 실행기 — 매 바퀴 새 claude 헤드리스 세션을 띄운다
-# launchd 가 이 파일을 계속 켜 둔다 (loop/ctl.sh on)
-# macOS 기본 bash 3.2 에서 돌도록 작성
+# loop/ctl.sh on 이 켠다 (macOS: launchd / Windows Git Bash·Linux: 백그라운드)
+# macOS 기본 bash 3.2 · Windows Git Bash 에서 돌도록 작성
 # ─────────────────────────────────────────────
 set -u
 
@@ -21,7 +21,7 @@ ROUTER_ENV_UNSET=(-u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_BASE
 # 왜: 이걸 빠뜨리면 컨텍스트 상한·자동 요약 기준이 풀려 바퀴가 220K 까지 불어난다 (Snarehaven #160 실측, 입력 2배).
 # 계정마다 설정 폴더가 다르므로 그 계정 것을 읽는다 (default = ~/.claude).
 lean_settings() {
-  python3 - "$1/settings.json" <<'PY'
+  "${LOOP_PY:-python3}" - "$1/settings.json" <<'PY'
 import json, shutil, sys
 try: u = json.load(open(sys.argv[1]))
 except Exception: u = {}
@@ -171,7 +171,14 @@ while :; do
   effort="${LOOP_EFFORT:-}"
   [ "$idle" -ge 1 ] && [ -n "${LOOP_EFFORT_RETRY:-}" ] && effort="$LOOP_EFFORT_RETRY"
 
-  set -- -p "$prompt" --model "$LOOP_MODEL" --output-format stream-json --verbose
+  # 모델: LOOP_MODEL="auto" 면 이번 바퀴 할 일을 보고 고른다 (loop/pick_model.py). 못 고르면 기본 모델
+  model="$LOOP_MODEL"
+  if [ "$LOOP_MODEL" = "auto" ]; then
+    model="$("$LOOP_PY" "$LOOP_DIR/pick_model.py" "$idle" "${LOOP_MODEL_DEFAULT:-sonnet}" 2>/dev/null)"
+    case "$model" in haiku|sonnet|opus) ;; *) model="${LOOP_MODEL_DEFAULT:-sonnet}" ;; esac
+  fi
+
+  set -- -p "$prompt" --model "$model" --output-format stream-json --verbose
   [ -n "$effort" ] && set -- "$@" --effort "$effort"
   [ -n "${LOOP_FALLBACK_MODEL:-}" ] && set -- "$@" --fallback-model "$LOOP_FALLBACK_MODEL"
   [ -n "${LOOP_MAX_BUDGET_USD:-}" ] && set -- "$@" --max-budget-usd "$LOOP_MAX_BUDGET_USD"
@@ -192,7 +199,7 @@ while :; do
   note=""
   all_limited=1
   usage_limited=0
-  log "바퀴 #$lap 시작 (모델 $LOOP_MODEL, 노력 ${effort:-기본})"
+  log "바퀴 #$lap 시작 (모델 $model, 노력 ${effort:-기본})"
 
   for acct in $LOOP_ACCOUNTS; do
     if [ "$acct" != "default" ] && [ ! -d "$acct" ]; then
@@ -213,7 +220,7 @@ while :; do
       rc=$?
     fi
     # 사람이 읽을 요약(.log) = stderr + 최종 답 + 실행한 명령 목록. 한도 문구 판정도 이 파일로.
-    [ "$LOOP_DRY_RUN" = "1" ] || python3 "$LOOP_DIR/lap_audit.py" render "$raw" >> "$out" 2>&1
+    [ "$LOOP_DRY_RUN" = "1" ] || "$LOOP_PY" "$LOOP_DIR/lap_audit.py" render "$raw" >> "$out" 2>&1
 
     # 한도 = 한도 문구가 있고 + 실제로 커밋을 하나도 못 남겼을 때 (종료 코드만 믿지 않는다 — 0 으로 끝나며 한도 문구만 남긴 경우가 있었다)
     if [ "$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)" = "0" ] && grep -Eiq "$LIMIT_RE" "$out"; then
@@ -238,7 +245,7 @@ while :; do
     budget=(); [ -n "${LOOP_API_MAX_BUDGET_USD:-}" ] && budget=(--max-budget-usd "$LOOP_API_MAX_BUDGET_USD")
     run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env -u CLAUDE_CONFIG_DIR "${ROUTER_ENV_UNSET[@]}" ANTHROPIC_API_KEY="$api_key" "$LOOP_CLAUDE_BIN" "$@" ${lean[@]+"${lean[@]}"} ${budget[@]+"${budget[@]}"} > "$raw" 2> "$out"
     rc=$?
-    python3 "$LOOP_DIR/lap_audit.py" render "$raw" >> "$out" 2>&1
+    "$LOOP_PY" "$LOOP_DIR/lap_audit.py" render "$raw" >> "$out" 2>&1
     if [ "$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)" = "0" ] && grep -Eiq "$LIMIT_RE" "$out"; then
       log "API 키도 한도·오류 (rc=$rc)"
       note="${note} limit:api"
@@ -258,11 +265,11 @@ while :; do
   # 턴·토큰·추정비용 (기록의 마지막 result 줄에서). 시험 바퀴·기록 없음이면 빈 칸
   spent=",,,,"
   if [ "$LOOP_DRY_RUN" != "1" ] && [ -f "$raw" ]; then
-    spent="$(python3 "$LOOP_DIR/lap_audit.py" usage "$raw" 2>/dev/null)"
+    spent="$("$LOOP_PY" "$LOOP_DIR/lap_audit.py" usage "$raw" 2>/dev/null)"
     [ -n "$spent" ] || spent=",,,,"
   fi
-  echo "$(date '+%Y-%m-%d %H:%M:%S'),$lap,$used_account,$LOOP_MODEL,$rc,$commits/$work,$secs,$note,$effort,$spent" >> logs/usage.csv
-  [ "$LOOP_DRY_RUN" = "1" ] || echo "$(date '+%Y-%m-%d %H:%M:%S'),$lap,$(python3 "$LOOP_DIR/lap_audit.py" context "$raw" 2>/dev/null || echo 0,0,0,0,0)" >> logs/context.csv
+  echo "$(date '+%Y-%m-%d %H:%M:%S'),$lap,$used_account,$model,$rc,$commits/$work,$secs,$note,$effort,$spent" >> logs/usage.csv
+  [ "$LOOP_DRY_RUN" = "1" ] || echo "$(date '+%Y-%m-%d %H:%M:%S'),$lap,$("$LOOP_PY" "$LOOP_DIR/lap_audit.py" context "$raw" 2>/dev/null || echo 0,0,0,0,0)" >> logs/context.csv
   log "바퀴 #$lap 끝 — 종료코드 $rc, 커밋 $commits(일 $work), ${secs}초 ${note}"
   # 옛 claude 가 --effort 를 모르면 매 바퀴가 시작도 못 하고 끝난다 — 원인을 바로 알려 준다
   if [ "$LOOP_DRY_RUN" != "1" ] && grep -q "unknown option '--effort'" "$out" 2>/dev/null; then
@@ -273,7 +280,7 @@ while :; do
 
   # STATUS 에 적힌 "통과(`인용`)" 이 실제 도구 출력에 있었는지 기계로 대조 (Verification.md 1 — jev 가 UNAVAILABLE 이어도 이건 돈다)
   if [ "$LOOP_DRY_RUN" != "1" ] && [ "$commits" != "0" ]; then
-    audit="$(python3 "$LOOP_DIR/lap_audit.py" check "$raw" "$pre" 2>&1)" || alert "바퀴 #$lap 검사 인용 불일치 — $audit"
+    audit="$("$LOOP_PY" "$LOOP_DIR/lap_audit.py" check "$raw" "$pre" 2>&1)" || alert "바퀴 #$lap 검사 인용 불일치 — $audit"
     log "감사: $audit"
   fi
 
@@ -281,7 +288,7 @@ while :; do
   if [ "$LOOP_DRY_RUN" != "1" ]; then
     today="$(date '+%Y-%m-%d')"
     if [ "$(cat logs/size_alert_day 2>/dev/null)" != "$today" ]; then
-      grown="$(python3 "$LOOP_DIR/lap_audit.py" size "$ROOT" 2>&1)" || { alert "문서가 불어 매 바퀴 읽는 값이 커짐 — $grown"; echo "$today" > logs/size_alert_day; }
+      grown="$("$LOOP_PY" "$LOOP_DIR/lap_audit.py" size "$ROOT" 2>&1)" || { alert "문서가 불어 매 바퀴 읽는 값이 커짐 — $grown"; echo "$today" > logs/size_alert_day; }
     fi
   fi
 

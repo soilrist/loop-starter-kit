@@ -1,6 +1,6 @@
 ---
 name: new-script
-description: 새 스크립트·기능 코드를 만들어 달라는 요청("~하는 스크립트 만들어줘", "~기능 추가해줘")을 받았을 때 사용. 계획 승인 → 작성 → 규칙 검사 순서로 만든다.
+description: (game 프로필 — 게임 엔진 프로젝트에서만. 그 밖은 build-slice) 새 스크립트·기능 코드를 만들어 달라는 요청("~하는 스크립트 만들어줘", "~기능 추가해줘")을 받았을 때 사용. 계획 승인 → 작성 → 규칙 검사 순서로 만든다.
 ---
 
 1. `docs/conventions/CodingStyle.md`, `docs/conventions/FolderStructure.md` 를 읽는다. 콘텐츠(몬스터·아이템 등)면 `DataDriven.md` 도.
