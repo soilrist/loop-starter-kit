@@ -134,6 +134,33 @@ while :; do
     fi
   fi
 
+  # 바퀴 사이 자동 정리 (LOOP_AUTO_TIDY=1 기본): STATUS 가 한도를 넘으면 오래된 기록을 docs/archive/ 로 옮기고 커밋한다
+  # 왜: tidy 는 루프가 도는 중엔 거절돼서 감독이 wrapup·대기·tidy·on 을 손으로 이어야 했고, 그 사이 일꾼은 STATUS 수천 줄을 매 바퀴 읽었다
+  if [ "$LOOP_DRY_RUN" != "1" ] && [ "${LOOP_AUTO_TIDY:-1}" = "1" ] && [ -z "$(git status --porcelain docs/ 2>/dev/null)" ]; then
+    "$LOOP_PY" "$LOOP_DIR/lap_audit.py" tidy . > logs/tidy.log 2>&1 || true
+    if [ -n "$(git status --porcelain docs/STATUS.md docs/archive 2>/dev/null)" ]; then
+      if git add docs/STATUS.md docs/archive && git commit -q -m "docs(status): 오래된 기록을 docs/archive 로 옮김 (자동 정리)" >> logs/tidy.log 2>&1; then
+        log "자동 정리: STATUS 의 오래된 기록을 보관함"
+      else
+        alert "자동 정리 커밋 실패 — logs/tidy.log 확인 (감독이 loop/ctl.sh tidy 로 마무리)"
+      fi
+    fi
+  fi
+
+  # 일감이 그대로면 모델을 부르지 않는다
+  # 왜: 사람 답을 기다리는 줄만 남았는데 바퀴마다 전부 읽고 "할 일 없음" 한 줄만 남긴 일이 6바퀴씩 되풀이됐다 (두 프로젝트 실측)
+  # 헛바퀴가 난 뒤, 루프가 처리할 줄이 없고 INBOX·ROADMAP·DESIGN 이 그 바퀴 전과 같으면 바뀔 때까지 기다린다 (멈추지 않음 — STOP·WRAPUP 은 계속 본다)
+  if [ "$LOOP_DRY_RUN" != "1" ]; then
+    sig="$(cat docs/feedback/INBOX.md docs/ROADMAP.md docs/DESIGN.md 2>/dev/null | git hash-object --stdin)"
+    if [ "$idle" -ge 1 ] && [ "$sig" = "${idle_sig:-}" ] && [ "$("$LOOP_PY" "$LOOP_DIR/pick_model.py" --has-work 2>/dev/null)" = "0" ]; then
+      [ "${idle_told:-}" = "$sig" ] || alert "일감 없음 — INBOX·ROADMAP·DESIGN 이 바뀔 때까지 모델을 부르지 않고 기다림 (감독: 일감을 넣거나 사람 답을 받아 적을 것)"
+      idle_told="$sig"
+      nap "$LOOP_SLEEP_SEC"
+      continue
+    fi
+    idle_sig="$sig"
+  fi
+
   # 바퀴 전 점검: 엔진·에디터·MCP 가 죽어 있으면 claude 를 부르지 않는다 (LOOP_PREFLIGHT_CMD, 비우면 건너뜀)
   # 왜: 에디터가 죽은 채로 바퀴를 돌면 검사가 전부 "못 함" 인 바퀴에 사용량만 쓴다
   if [ "$LOOP_DRY_RUN" != "1" ] && [ -n "${LOOP_PREFLIGHT_CMD:-}" ]; then

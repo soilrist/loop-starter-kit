@@ -9,7 +9,7 @@
 
 왜: 단순 조각까지 같은 모델로 돌리면 비싸고, 위험한 조각을 싼 모델로 돌리면 다시 하느라 더 든다.
 프로젝트 낱말: loop/model_words.txt 가 있으면 더한다 (한 줄에 `opus: 낱말, 낱말` 또는 `haiku: 낱말, 낱말`, # 은 주석).
-쓰는 법: python3 loop/pick_model.py <헛바퀴 수> [기본 모델]   ·   python3 loop/pick_model.py --selftest
+쓰는 법: python3 loop/pick_model.py <헛바퀴 수> [기본 모델]   ·   --selftest   ·   --has-work (루프가 할 줄이 있으면 1, 없으면 0)
 """
 import re
 import sys
@@ -101,6 +101,9 @@ def selftest() -> int:
 def main() -> int:
     if sys.argv[1:2] == ["--selftest"]:
         return selftest()
+    if sys.argv[1:2] == ["--has-work"]:
+        print(0 if next_task(read("docs/feedback/INBOX.md"), read("docs/ROADMAP.md")) == "계획 바퀴" else 1)
+        return 0
     try:
         idle = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     except ValueError:

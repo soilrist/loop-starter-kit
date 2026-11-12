@@ -55,6 +55,9 @@ LOOP_API_KEY_FILE="$HOME/.claude-loop-api-key"
 # API 바퀴 한 번의 비용 상한(달러, 비우면 LOOP_MAX_BUDGET_USD 만 적용)
 LOOP_API_MAX_BUDGET_USD=""
 
+# 바퀴 사이 자동 정리: 1(기본)이면 STATUS 가 한도를 넘을 때 루프가 스스로 오래된 기록을 docs/archive/ 로 옮기고 커밋
+LOOP_AUTO_TIDY=1
+
 # 헛바퀴(커밋 0) 연속 몇 번이면 경고 / 그 두 배면 스스로 멈춤
 LOOP_MAX_IDLE=3
 LOOP_IDLE_SLEEP_SEC=3600

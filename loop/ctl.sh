@@ -129,7 +129,7 @@ case "${1:-status}" in
       exit 1
     fi
     cd "$ROOT" || exit 1
-    [ "$(git config core.hooksPath)" = ".githooks" ] || { echo "✖ 훅 미설치: git config core.hooksPath .githooks"; exit 1; }
+    [ "$(git config core.hooksPath)" = ".githooks" ] || { git config core.hooksPath .githooks && echo "· 훅이 안 걸려 있어서 걸었음 (core.hooksPath=.githooks)"; }
     if [ -n "$(running_pid)" ]; then
       echo "✔ 이미 돌고 있음 (pid $(running_pid)) — STOP/WRAPUP/HOLD 표시만 지움"
       rm -f "$LOOP_DIR/STOP" "$LOOP_DIR/WRAPUP" "$LOOP_DIR/HOLD"
@@ -196,7 +196,7 @@ case "${1:-status}" in
     # STATUS 의 오래된 바퀴·"지금 상태"에서 넘친 항목을 docs/archive/ 로 옮긴다 (버리지 않음). 루프가 도는 중엔 하지 않는다
     cd "$ROOT" || exit 1
     if [ -n "$(running_pid)" ] && [ "${2:-}" != "--dry" ]; then
-      echo "✖ 루프가 도는 중 — 먼저 ctl.sh wrapup 으로 멈춘 뒤 (일꾼이 같은 파일을 고치고 있을 수 있음). 미리 보기는 ctl.sh tidy --dry"
+      echo "✖ 루프가 도는 중 — 먼저 ctl.sh wrapup 으로 멈춘 뒤 (일꾼이 같은 파일을 고치고 있을 수 있음). 미리 보기는 ctl.sh tidy --dry. (LOOP_AUTO_TIDY=1 이면 루프가 바퀴 사이에 스스로 정리함)"
       exit 1
     fi
     "$LOOP_PY" "$LOOP_DIR/lap_audit.py" tidy . ${2:+"$2"}
