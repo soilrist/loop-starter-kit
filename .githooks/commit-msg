@@ -19,12 +19,16 @@ fail() {
 pattern='^(feat|fix|data|art|refactor|perf|test|docs|build|chore|revert|merge)(\([a-z0-9-]+\))?!?: .+$'
 printf '%s\n' "$first_line" | grep -Eq "$pattern" || fail "첫 줄 형식이 틀림"
 
-# 요약 길이는 글자 수로 (한글도 1글자) — python3 있으면 정확히
-if ! command -v python3 >/dev/null 2>&1 && [ -n "${LOOP_LAP:-}" ]; then
-  fail "python3 가 없어 글자 수를 검사할 수 없음 (루프 커밋은 거절)"
+# 요약 길이는 글자 수로 (한글도 1글자) — 파이썬이 있으면 정확히
+PY=""
+for c in python3 python py; do
+  if "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)' >/dev/null 2>&1; then PY="$c"; break; fi
+done
+if [ -z "$PY" ] && [ -n "${LOOP_LAP:-}" ]; then
+  fail "파이썬(3.8+)이 없어 글자 수를 검사할 수 없음 (루프 커밋은 거절)"
 fi
-if command -v python3 >/dev/null 2>&1; then
-  n="$(printf '%s' "$first_line" | python3 -c 'import sys; s=sys.stdin.buffer.read().decode("utf-8","replace"); print(len(s.split(": ",1)[1]) if ": " in s else 0)')"
+if [ -n "$PY" ]; then
+  n="$(printf '%s' "$first_line" | "$PY" -c 'import sys; s=sys.stdin.buffer.read().decode("utf-8","replace"); print(len(s.split(": ",1)[1]) if ": " in s else 0)')"
   [ "$n" -ge 2 ] && [ "$n" -le 72 ] || fail "요약은 2~72글자 (지금 ${n}글자)"
   case "$first_line" in *.) fail "요약 끝에 마침표 금지" ;; esac
 fi

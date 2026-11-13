@@ -4,8 +4,8 @@
 # 사람이 직접 고칠 필요 없음: 감독에게 "30분마다로 바꿔줘" 라고 말하면 됨
 # ─────────────────────────────────────────────
 
-# 이 프로젝트 이름 (launchd 라벨·알림에 씀, 영어 소문자·하이픈)
-LOOP_SLUG="${LOOP_SLUG:-mygame}"
+# 이 프로젝트 이름 (자동 시작 라벨·알림에 씀, 영어 소문자·하이픈)
+LOOP_SLUG="${LOOP_SLUG:-myproject}"
 LOOP_LABEL="com.${LOOP_SLUG}.loop"
 
 # 바퀴가 "끝난 뒤" 쉬는 시간(초). 평시 180 / 아낄 때 900 / 한도 빠듯하면 1800
@@ -14,8 +14,11 @@ LOOP_SLEEP_SEC=1800
 # 한 바퀴 최대 시간(초). 넘으면 끊고 다음 바퀴
 LOOP_LAP_TIMEOUT_SEC=2400
 
-# 모델: 소넷 우선, 과부하 시 오퍼스 (claude --fallback-model)
+# 모델: haiku / sonnet / opus / auto. 과부하 시 LOOP_FALLBACK_MODEL (claude --fallback-model)
+# auto = 바퀴마다 할 일을 보고 고른다 (loop/pick_model.py): 단순한 줄은 haiku, 돈·권한·설계는 opus, 나머지는 LOOP_MODEL_DEFAULT
+#   조각 줄에 〔모델: opus〕 처럼 적으면 그대로. 프로젝트 낱말은 loop/model_words.txt (opus: 낱말, 낱말 / haiku: 낱말)
 LOOP_MODEL="sonnet"
+LOOP_MODEL_DEFAULT="sonnet"
 LOOP_FALLBACK_MODEL="opus"
 
 # 노력 단계 (claude --effort): low / medium / high / xhigh / max. 비우면 claude 기본값
@@ -52,6 +55,9 @@ LOOP_API_KEY_FILE="$HOME/.claude-loop-api-key"
 # API 바퀴 한 번의 비용 상한(달러, 비우면 LOOP_MAX_BUDGET_USD 만 적용)
 LOOP_API_MAX_BUDGET_USD=""
 
+# 바퀴 사이 자동 정리: 1(기본)이면 STATUS·INBOX 가 한도를 넘을 때 루프가 스스로 오래된 기록(INBOX 는 끝난 항목·오래된 확인)을 docs/archive/ 로 옮기고 커밋
+LOOP_AUTO_TIDY=1
+
 # 헛바퀴(커밋 0) 연속 몇 번이면 경고 / 그 두 배면 스스로 멈춤
 LOOP_MAX_IDLE=3
 LOOP_IDLE_SLEEP_SEC=3600
@@ -62,9 +68,19 @@ LOOP_LIMIT_SLEEP_SEC=3600
 # 헤드리스 권한 — 위험 명령은 .claude/settings.json 의 deny 로 막혀 있음
 LOOP_PERMISSION_FLAGS="--dangerously-skip-permissions"
 
-# claude 실행 파일 (launchd 는 PATH 가 짧아서 직접 찾아 줌)
+# claude 실행 파일 (자동 시작은 PATH 가 짧아서 직접 찾아 줌)
 export PATH="$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$HOME/.npm-global/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 LOOP_CLAUDE_BIN="$(command -v claude || echo claude)"
+
+# 파이썬 (3.8 이상): python3 → python → py 순서로 "실제로 도는 것"을 고른다 (Windows 의 python3 는 가짜 스텁일 수 있다)
+LOOP_PY="${LOOP_PY:-}"
+if [ -z "$LOOP_PY" ]; then
+  for _c in python3 python py; do
+    if "$_c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)' >/dev/null 2>&1; then LOOP_PY="$_c"; break; fi
+  done
+fi
+LOOP_PY="${LOOP_PY:-python3}"
+export PYTHONUTF8=1
 
 # 시험용: 1 이면 claude 를 부르지 않고 흉내만 / 최대 바퀴 수(비우면 무한)
 LOOP_DRY_RUN="${LOOP_DRY_RUN:-0}"

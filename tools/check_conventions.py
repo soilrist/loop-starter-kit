@@ -513,9 +513,10 @@ def main() -> int:
     args = ap.parse_args()
 
     repo = find_repo_root(Path.cwd())
-    engine = args.engine or detect_engine(repo) or "unity"
-    profile = ENGINE_PROFILES[engine]
-    content_dirs = find_content_dirs(repo, engine, profile, args.root)
+    engine = args.engine or detect_engine(repo)
+    generic = engine is None  # 게임 엔진이 아닌 프로젝트 (앱·콘텐츠·자동화·일반 프로필)
+    profile = ENGINE_PROFILES[engine or "unity"]
+    content_dirs = [] if generic else find_content_dirs(repo, engine, profile, args.root)
 
     only = None
     if args.changed or args.staged:
@@ -523,7 +524,14 @@ def main() -> int:
         if only is None:
             print("⚠ git 변경 목록을 못 읽음 → 전체 검사로 진행")
 
-    if not content_dirs:
+    if generic:
+        # 엔진 규칙은 게임 프로필 것이다. 다른 프로필의 검사는 docs/STATUS.md "검사 명령" 칸의 명령이 맡는다
+        if not args.quiet:
+            print("ℹ 게임 엔진 프로젝트가 아님 — 일반 모드: 엔진 규칙은 건너뜀 (검사는 docs/STATUS.md '검사 명령' 칸)")
+        rep = run(repo, [], only, profile)
+        for rid in [r for r in RULES if r != "R13"]:
+            rep.not_checked[rid] = "게임 엔진 프로젝트 아님 (일반 모드)"
+    elif not content_dirs:
         print(f"⚠ {engine} 엔진 프로젝트 폴더를 못 찾음 — 이름·폴더 검사는 '못 함'")
         rep = run(repo, [], only, profile)
         for rid in [r for r in RULES if r != "R13"]:
@@ -534,7 +542,7 @@ def main() -> int:
     placeholders = [w for w in rep.warnings if w[0] == "R12"]
     others = [w for w in rep.warnings if w[0] != "R12"]
     if args.quiet and not rep.errors:
-        print(f"✔ 규칙 검사 통과 (경고 {len(others)} / 미정 숫자 {len(placeholders)})")
+        print(f"✔ 규칙 검사 통과{' [일반 모드]' if generic else ''} (경고 {len(others)} / 미정 숫자 {len(placeholders)})")
         return 0
 
     def show(title: str, rows: list[tuple[str, str, str]]) -> None:
@@ -545,7 +553,7 @@ def main() -> int:
         for rule, where, msg in rows:
             print(f"- [{rule}] {where} — {msg}")
 
-    print(f"엔진: {engine} · 검사 대상: {', '.join(a.relative_to(repo).as_posix() for a in content_dirs) or '-'}"
+    print(f"엔진: {engine or '없음(일반 모드)'} · 검사 대상: {', '.join(a.relative_to(repo).as_posix() for a in content_dirs) or '-'}"
           f"{'  (바뀐 파일만)' if only is not None else ''}")
     show("오류 — 커밋 금지", rep.errors)
     show("경고", others)

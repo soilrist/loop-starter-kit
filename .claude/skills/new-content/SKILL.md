@@ -1,6 +1,6 @@
 ---
 name: new-content
-description: 몬스터·아이템·스킬·퀘스트·대사 같은 게임 콘텐츠를 추가해 달라는 요청("고블린 추가해줘", "포션 아이템 만들어줘")을 받았을 때 사용. 코드가 아니라 데이터 에셋으로 추가한다.
+description: (game 프로필 — 게임 엔진 프로젝트에서만. 그 밖은 build-slice) 몬스터·아이템·스킬·퀘스트·대사 같은 게임 콘텐츠를 추가해 달라는 요청("고블린 추가해줘", "포션 아이템 만들어줘")을 받았을 때 사용. 코드가 아니라 데이터 에셋으로 추가한다.
 ---
 
 1. `docs/conventions/DataDriven.md`, `docs/conventions/AssetNaming.md` 를 읽는다.

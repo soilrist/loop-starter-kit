@@ -1,10 +1,11 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
 # 루프 스위치 — 사람은 직접 안 써도 됨. 감독에게 "켜/꺼/상태" 라고 말하면 감독이 실행
-#   on      루프 켜기 (launchd 등록, 로그인해도 자동 시작) + 감시(watchdog.sh, 15분) 등록
+#   on      루프 켜기 + 감시(watchdog.sh, 15분) 등록
+#           macOS: launchd (로그인해도 자동 시작) / Windows Git Bash: 백그라운드 + 작업 스케줄러 감시 / Linux: 백그라운드
 #   wrapup  하던 조각 마무리하고 멈추기 (권장)
 #   off     다음 바퀴부터 멈추기 (진행 중인 바퀴는 끝까지)
-#   kill    지금 즉시 강제 종료 + launchd·감시 해제
+#   kill    지금 즉시 강제 종료 + 자동 시작·감시 해제
 #   (off·wrapup·kill 은 loop/HOLD 를 남겨 감시가 다시 켜지 않게 한다. on 이 지운다)
 #   status  상태 보기
 #   cost    최근 20바퀴의 "일한 바퀴 하나당" 턴·토큰·추정비용 (cost 50 처럼 바퀴 수 지정 가능)
@@ -21,6 +22,7 @@ PLIST="$HOME/Library/LaunchAgents/${LOOP_LABEL}.plist"
 UID_NUM="$(id -u)"
 WD_LABEL="${LOOP_LABEL}-watchdog"
 WD_PLIST="$HOME/Library/LaunchAgents/${WD_LABEL}.plist"
+case "$(uname -s 2>/dev/null)" in Darwin) OS=mac ;; MINGW*|MSYS*|CYGWIN*) OS=win ;; *) OS=other ;; esac
 
 write_plist() {
   mkdir -p "$HOME/Library/LaunchAgents" "$ROOT/logs"
@@ -46,7 +48,7 @@ PL
 }
 
 # 감시: 루프가 꺼져 있는데 INBOX 에 루프 몫이 남았으면 다시 켠다 (loop/watchdog.sh)
-write_watchdog() {
+write_watchdog_mac() {
   cat > "$WD_PLIST" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -65,6 +67,57 @@ PL
   launchctl print "gui/$UID_NUM/$WD_LABEL" >/dev/null 2>&1 || launchctl bootstrap "gui/$UID_NUM" "$WD_PLIST" 2>/dev/null || true
 }
 
+# 감시 등록 — OS 마다 방법이 다르다. 등록에 실패해도 루프는 켠다 (감시만 없음)
+write_watchdog() {
+  case "$OS" in
+    mac) write_watchdog_mac ;;
+    win)
+      # 작업 스케줄러: 15분마다 Git Bash 로 watchdog.sh
+      MSYS_NO_PATHCONV=1 schtasks /Create /F /SC MINUTE /MO 15 /TN "$WD_LABEL" \
+        /TR "\"$(cygpath -w "$(command -v bash)")\" -lc \"cd '$ROOT' && bash loop/watchdog.sh\"" >/dev/null 2>&1 \
+        || echo "⚠ 감시 등록 실패 (작업 스케줄러) — 루프는 켜지지만 꺼졌을 때 자동으로 다시 안 켜짐"
+      ;;
+    *) echo "ℹ 이 OS 는 감시 자동 등록 없음 — 필요하면 cron 에: */15 * * * * cd '$ROOT' && bash loop/watchdog.sh" ;;
+  esac
+}
+
+watchdog_on() {
+  case "$OS" in
+    mac) launchctl print "gui/$UID_NUM/$WD_LABEL" >/dev/null 2>&1 ;;
+    win) MSYS_NO_PATHCONV=1 schtasks /Query /TN "$WD_LABEL" >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+
+# 루프 시작 — macOS 는 launchd 가 계속 켜 둔다. 그 밖은 백그라운드로 띄운다 (꺼지면 감시가 다시 켠다)
+start_loop() {
+  if [ "$OS" != "mac" ]; then
+    mkdir -p "$ROOT/logs"
+    LOOP_SLUG="$LOOP_SLUG" nohup bash "$LOOP_DIR/loop.sh" >> "$ROOT/logs/loop.out.log" 2>&1 &
+    echo "✔ 켜짐: $LOOP_LABEL (백그라운드 pid $!, 쉬는 시간 ${LOOP_SLEEP_SEC}초)"
+    return 0
+  fi
+  write_plist
+  if launchctl print "gui/$UID_NUM/$LOOP_LABEL" >/dev/null 2>&1; then
+    launchctl bootout "gui/$UID_NUM/$LOOP_LABEL" 2>/dev/null || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      launchctl print "gui/$UID_NUM/$LOOP_LABEL" >/dev/null 2>&1 || break
+      sleep 1
+    done
+  fi
+  launchctl bootstrap "gui/$UID_NUM" "$PLIST" && echo "✔ 켜짐: $LOOP_LABEL (쉬는 시간 ${LOOP_SLEEP_SEC}초)"
+}
+
+stop_services() {
+  case "$OS" in
+    mac)
+      launchctl bootout "gui/$UID_NUM/$LOOP_LABEL" 2>/dev/null || true
+      launchctl bootout "gui/$UID_NUM/$WD_LABEL" 2>/dev/null || true
+      ;;
+    win) MSYS_NO_PATHCONV=1 schtasks /Delete /F /TN "$WD_LABEL" >/dev/null 2>&1 || true ;;
+  esac
+}
+
 running_pid() {
   if [ -f "$LOOP_DIR/.lock" ] && kill -0 "$(cat "$LOOP_DIR/.lock")" 2>/dev/null; then cat "$LOOP_DIR/.lock"; fi
 }
@@ -76,7 +129,7 @@ case "${1:-status}" in
       exit 1
     fi
     cd "$ROOT" || exit 1
-    [ "$(git config core.hooksPath)" = ".githooks" ] || { echo "✖ 훅 미설치: git config core.hooksPath .githooks"; exit 1; }
+    [ "$(git config core.hooksPath)" = ".githooks" ] || { git config core.hooksPath .githooks && echo "· 훅이 안 걸려 있어서 걸었음 (core.hooksPath=.githooks)"; }
     if [ -n "$(running_pid)" ]; then
       echo "✔ 이미 돌고 있음 (pid $(running_pid)) — STOP/WRAPUP/HOLD 표시만 지움"
       rm -f "$LOOP_DIR/STOP" "$LOOP_DIR/WRAPUP" "$LOOP_DIR/HOLD"
@@ -91,16 +144,8 @@ case "${1:-status}" in
       else git checkout -q -b develop || exit 1; echo "✔ develop 브랜치를 만들어 이동"; fi
     fi
     rm -f "$LOOP_DIR/STOP" "$LOOP_DIR/WRAPUP" "$LOOP_DIR/HOLD"
-    write_plist
     write_watchdog
-    if launchctl print "gui/$UID_NUM/$LOOP_LABEL" >/dev/null 2>&1; then
-      launchctl bootout "gui/$UID_NUM/$LOOP_LABEL" 2>/dev/null || true
-      for _ in 1 2 3 4 5 6 7 8 9 10; do
-        launchctl print "gui/$UID_NUM/$LOOP_LABEL" >/dev/null 2>&1 || break
-        sleep 1
-      done
-    fi
-    launchctl bootstrap "gui/$UID_NUM" "$PLIST" && echo "✔ 켜짐: $LOOP_LABEL (쉬는 시간 ${LOOP_SLEEP_SEC}초)"
+    start_loop
     ;;
   wrapup)
     touch "$LOOP_DIR/WRAPUP" "$LOOP_DIR/HOLD"
@@ -112,18 +157,21 @@ case "${1:-status}" in
     ;;
   kill)
     touch "$LOOP_DIR/STOP" "$LOOP_DIR/HOLD"
-    launchctl bootout "gui/$UID_NUM/$LOOP_LABEL" 2>/dev/null || true
-    launchctl bootout "gui/$UID_NUM/$WD_LABEL" 2>/dev/null || true
-    pid="$(running_pid)"; [ -n "$pid" ] && pkill -TERM -P "$pid" 2>/dev/null; [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null
-    echo "✔ 강제 종료 + launchd 해제"
+    pid="$(running_pid)"
+    stop_services
+    # Windows: 자식(claude)까지 같이 끝내려면 taskkill /T 가 필요하다
+    if [ -n "$pid" ] && [ "$OS" = "win" ] && [ -r "/proc/$pid/winpid" ]; then MSYS_NO_PATHCONV=1 taskkill /T /F /PID "$(cat "/proc/$pid/winpid")" >/dev/null 2>&1; fi
+    [ -n "$pid" ] && pkill -TERM -P "$pid" 2>/dev/null; [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null
+    echo "✔ 강제 종료 + 자동 시작·감시 해제"
     ;;
   status)
     cd "$ROOT" || exit 1
     pid="$(running_pid)"
     echo "라벨      : $LOOP_LABEL"
+    echo "키트      : $(cat "$LOOP_DIR/KIT_VERSION" 2>/dev/null || echo "모름 (2.x 이하)") / OS $OS / 파이썬 $LOOP_PY"
     echo "실행 중   : ${pid:-아니오}"
     echo "STOP/WRAPUP: $( [ -f "$LOOP_DIR/STOP" ] && echo STOP ) $( [ -f "$LOOP_DIR/WRAPUP" ] && echo WRAPUP )"
-    echo "감시      : $(launchctl print "gui/$UID_NUM/$WD_LABEL" >/dev/null 2>&1 && echo 켬 || echo 꺼짐)$( [ -f "$LOOP_DIR/HOLD" ] && echo " (HOLD — 일부러 세움)")"
+    echo "감시      : $(watchdog_on && echo 켬 || echo 꺼짐)$( [ -f "$LOOP_DIR/HOLD" ] && echo " (HOLD — 일부러 세움)")"
     echo "마지막 바퀴: $(cat logs/lap 2>/dev/null || echo 0)"
     echo "설정      : 모델 $LOOP_MODEL / 노력 ${LOOP_EFFORT:-기본}(막히면 ${LOOP_EFFORT_RETRY:-그대로}) / 쉬는 시간 ${LOOP_SLEEP_SEC}초 / 계정 $LOOP_ACCOUNTS / 가벼운 바퀴 $([ "${LOOP_LEAN:-1}" = "1" ] && echo 켬 || echo 끔)"
     if [ "${LOOP_LEAN:-1}" = "1" ]; then
@@ -136,22 +184,22 @@ case "${1:-status}" in
     ;;
   cost)
     cd "$ROOT" || exit 1
-    python3 "$LOOP_DIR/lap_audit.py" report logs/usage.csv "${2:-20}"; rc=$?
-    python3 "$LOOP_DIR/lap_audit.py" ctxreport logs/context.csv "${2:-20}"
+    "$LOOP_PY" "$LOOP_DIR/lap_audit.py" report logs/usage.csv "${2:-20}"; rc=$?
+    "$LOOP_PY" "$LOOP_DIR/lap_audit.py" ctxreport logs/context.csv "${2:-20}"
     exit $rc
     ;;
   size)
     cd "$ROOT" || exit 1
-    python3 "$LOOP_DIR/lap_audit.py" size .
+    "$LOOP_PY" "$LOOP_DIR/lap_audit.py" size .
     ;;
   tidy)
     # STATUS 의 오래된 바퀴·"지금 상태"에서 넘친 항목을 docs/archive/ 로 옮긴다 (버리지 않음). 루프가 도는 중엔 하지 않는다
     cd "$ROOT" || exit 1
     if [ -n "$(running_pid)" ] && [ "${2:-}" != "--dry" ]; then
-      echo "✖ 루프가 도는 중 — 먼저 ctl.sh wrapup 으로 멈춘 뒤 (일꾼이 같은 파일을 고치고 있을 수 있음). 미리 보기는 ctl.sh tidy --dry"
+      echo "✖ 루프가 도는 중 — 먼저 ctl.sh wrapup 으로 멈춘 뒤 (일꾼이 같은 파일을 고치고 있을 수 있음). 미리 보기는 ctl.sh tidy --dry. (LOOP_AUTO_TIDY=1 이면 루프가 바퀴 사이에 스스로 정리함)"
       exit 1
     fi
-    python3 "$LOOP_DIR/lap_audit.py" tidy . ${2:+"$2"}
+    "$LOOP_PY" "$LOOP_DIR/lap_audit.py" tidy . ${2:+"$2"}
     ;;
   try)
     LOOP_DRY_RUN=1 LOOP_MAX_LOOPS=2 LOOP_FORCE_SLEEP_SEC=1 bash "$LOOP_DIR/loop.sh"
