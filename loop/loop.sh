@@ -138,9 +138,9 @@ while :; do
   # 왜: tidy 는 루프가 도는 중엔 거절돼서 감독이 wrapup·대기·tidy·on 을 손으로 이어야 했고, 그 사이 일꾼은 STATUS 수천 줄을 매 바퀴 읽었다
   if [ "$LOOP_DRY_RUN" != "1" ] && [ "${LOOP_AUTO_TIDY:-1}" = "1" ] && [ -z "$(git status --porcelain docs/ 2>/dev/null)" ]; then
     "$LOOP_PY" "$LOOP_DIR/lap_audit.py" tidy . > logs/tidy.log 2>&1 || true
-    if [ -n "$(git status --porcelain docs/STATUS.md docs/archive 2>/dev/null)" ]; then
-      if git add docs/STATUS.md docs/archive && git commit -q -m "docs(status): 오래된 기록을 docs/archive 로 옮김 (자동 정리)" >> logs/tidy.log 2>&1; then
-        log "자동 정리: STATUS 의 오래된 기록을 보관함"
+    if [ -n "$(git status --porcelain docs/STATUS.md docs/feedback/INBOX.md docs/archive 2>/dev/null)" ]; then
+      if git add docs/STATUS.md docs/feedback/INBOX.md docs/archive && git commit -q -m "docs(status): 오래된 기록을 docs/archive 로 옮김 (자동 정리)" >> logs/tidy.log 2>&1; then
+        log "자동 정리: STATUS·INBOX 의 오래된 기록을 보관함"
       else
         alert "자동 정리 커밋 실패 — logs/tidy.log 확인 (감독이 loop/ctl.sh tidy 로 마무리)"
       fi

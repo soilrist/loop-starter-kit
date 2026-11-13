@@ -268,16 +268,87 @@ def tidy_plan(status_text, keep_laps=LAPS_KEEP, keep_now=NOW_KEEP):
     return new_status, archive, len(old_laps), now_line_count(over_now)
 
 
+def inbox_items(text):
+    """INBOX 를 덩어리로 나눈다 → [(항목인가, [줄…])]. 항목 = `- [` 줄 + 바로 이어지는 줄(빈 줄·다음 항목·제목·인용·주석 전까지)."""
+    chunks = []
+    for l in text.splitlines():
+        if l.startswith("- ["):
+            chunks.append((True, [l]))
+        elif chunks and chunks[-1][0] and l.strip() and not l.startswith(("#", ">", "<!--")):
+            chunks[-1][1].append(l)
+        else:
+            chunks.append((False, [l]))
+    return chunks
+
+
+def inbox_tidy_plan(text, max_chars=INBOX_MAX_CHARS):
+    """→ (새 INBOX, 보관 글, 옮긴 끝난 항목 수, 옮긴 확인 수).
+    줄 번호가 아니라 항목 단위로 옮긴다. 끝난 `[x]` 항목은 언제나, 그래도 한도를 넘으면 오래된 `확인` 부터.
+    `질문`·`승인`(사람 답 대기)과 루프 몫(결함·지시·답·보정·철회·보류·막힘)은 건드리지 않는다. 왜: 줄 번호로 잘라 보관했다가 살아 있는 항목이 사라진 것처럼 보인 일이 있었다."""
+    chunks = inbox_items(text)
+    move = {i for i, (is_item, ls) in enumerate(chunks) if is_item and re.match(r"- \[[xX]\]", ls[0])}
+    n_done = len(move)
+    size = len(text) - sum(len("\n".join(chunks[i][1])) + 1 for i in move)
+    n_confirm = 0
+    if size > max_chars:
+        def when(i):
+            m = re.search(r"\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2})?", chunks[i][1][0])
+            return m.group(0) if m else "9999"
+        confirms = sorted((i for i, (is_item, ls) in enumerate(chunks)
+                           if is_item and i not in move and re.match(r"- \[ \] 확인[(（]", ls[0])), key=when)
+        for i in confirms:
+            if size <= max_chars:
+                break
+            move.add(i)
+            n_confirm += 1
+            size -= len("\n".join(chunks[i][1])) + 1
+    if not move:
+        return text, "", 0, 0
+    new_text = "\n".join(l for i, (_, ls) in enumerate(chunks) if i not in move for l in ls) + "\n"
+    archive = "\n".join(l for i in sorted(move) for l in chunks[i][1]) + "\n"
+    return new_text, archive, n_done, n_confirm
+
+
+def tidy_inbox(root=".", dry=False):
+    ip = os.path.join(root, "docs/feedback/INBOX.md")
+    text = _read(ip)
+    new_text, archive, n_done, n_confirm = inbox_tidy_plan(text)
+    if not archive:
+        if len(text) > INBOX_MAX_CHARS:
+            print(f"INBOX {len(text):,}글자 — 자동으로 옮길 것 없음 (질문·승인·루프 몫만 남음) → 감독이 닫는다")
+        return 0
+    after = set(new_text.splitlines()) | set(archive.splitlines())
+    lost = [l for l in text.splitlines() if l.strip() and l not in after]
+    if lost:
+        print(f"중단: INBOX 를 정리하면 {len(lost)}줄이 사라짐 (첫 줄: {lost[0][:60]}) — INBOX 는 바꾸지 않음")
+        return 1
+    today = datetime.date.today().isoformat()
+    ap = os.path.join(root, "docs/archive", f"INBOX-{today}.md")
+    print(f"INBOX 끝난 항목 {n_done}개 · 오래된 확인 {n_confirm}개 → {os.path.relpath(ap, root)} "
+          f"(INBOX {len(text):,}글자 → {len(new_text):,}글자)")
+    if len(new_text) > INBOX_MAX_CHARS:
+        print(f"INBOX 가 아직 한도({INBOX_MAX_CHARS:,}자)를 넘음 — 남은 건 질문·승인·루프 몫 → 감독이 닫는다")
+    if dry:
+        return 0
+    os.makedirs(os.path.dirname(ap), exist_ok=True)
+    with open(ap, "a", encoding="utf-8") as f:
+        f.write(f"## INBOX 에서 옮긴 것 ({today} 정리 — 확인은 감독이 검수 때 본다)\n" + archive + "\n")
+    with open(ip, "w", encoding="utf-8") as f:
+        f.write(new_text)
+    return 0
+
+
 def tidy(root=".", dry=False):
     sp = os.path.join(root, "docs/STATUS.md")
     text = _read(sp)
     if not text:
         print("docs/STATUS.md 를 못 읽음")
         return 1
+    rc_inbox = tidy_inbox(root, dry)
     new_status, archive, n_laps, n_now = tidy_plan(text)
     if not archive.strip():
-        print("옮길 것 없음 (바퀴 기록·지금 상태 모두 한도 안)")
-        return 0
+        print("STATUS 옮길 것 없음 (바퀴 기록·지금 상태 모두 한도 안)")
+        return rc_inbox
     ap = os.path.join(root, "docs/archive", f"STATUS-{datetime.date.today().isoformat()}.md")
     # 한 글자도 버리지 않았는지: 옮긴 줄이 전부 새 STATUS 나 보관 글에 있어야 한다
     after = set(new_status.splitlines()) | set(archive.splitlines())
@@ -295,8 +366,8 @@ def tidy(root=".", dry=False):
         f.write(archive if archive.endswith("\n") else archive + "\n")
     with open(sp, "w", encoding="utf-8") as f:
         f.write(new_status)
-    print(f"다음: git add docs/STATUS.md {os.path.relpath(ap, root)} → 커밋 `docs(status): 오래된 기록 보관`")
-    return 0
+    print(f"다음: git add docs/STATUS.md docs/feedback/INBOX.md docs/archive → 커밋 `docs(status): 오래된 기록 보관`")
+    return rc_inbox
 
 
 def usage_fields(events):
@@ -502,6 +573,18 @@ def selftest():
     probs = " / ".join(size_problems(st, inbox))
     assert "지금 상태" in probs and "40줄" in probs and "확인·질문·승인 12개" in probs and "상시" in probs, probs
     assert size_problems(new, "# INBOX\n- [ ] 지시(감독, 2026-09-21 00:00) **고블린 속도 3.5.**\n") == [], size_problems(new, "")
+    box = ("# INBOX\n\n> 머리말\n\n<!-- 여기 아래에 적는다 -->\n"
+           "- [x] 지시(감독, 2026-09-01 10:00) **끝난 것.**\n  이어지는 줄\n"
+           "- [ ] 질문(루프#1, 2026-09-01 11:00) **사람 답 대기.**\n"
+           "- [ ] 확인(루프#3, 2026-09-03 10:00) **새 가정.** " + "가" * 300 + "\n"
+           "- [ ] 확인(루프#2, 2026-09-02 10:00) **옛 가정.** " + "나" * 300 + "\n"
+           "- [ ] 지시(감독, 2026-09-04 10:00) **할 일.**\n")
+    nb, arc, nd, nc = inbox_tidy_plan(box, max_chars=500)
+    assert (nd, nc) == (1, 1), (nd, nc)
+    assert "끝난 것" in arc and "이어지는 줄" in arc and "옛 가정" in arc, "끝난 항목·오래된 확인을 항목째 옮겨야 함"
+    assert all(s in nb for s in ("사람 답 대기", "새 가정", "할 일", "> 머리말", "<!-- 여기")), "질문·루프 몫·머리말은 남겨야 함"
+    assert all(l in set(nb.splitlines()) | set(arc.splitlines()) for l in box.splitlines() if l.strip()), "INBOX 정리하다 줄을 잃음"
+    assert inbox_tidy_plan(nb, max_chars=5000)[1] == "", "한도 안이고 끝난 것도 없는데 또 옮기려 함"
     out = "✔ 규칙 검사 통과 (경고 0 / 미정 숫자 0)\nPassed: 3, Failed: 0"
     ok = ["검사: 1층 통과(`✔ 규칙 검사 통과 (경고 0 / 미정 숫자 0)`) / 2층 통과(`Passed: 3, Failed: 0`)"]
     bad = ["검사: 1층 통과(`✔ 규칙 검사 통과 (경고 1)`)"]
