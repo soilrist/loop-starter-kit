@@ -14,12 +14,15 @@ LOOP_SLEEP_SEC=1800
 # 한 바퀴 최대 시간(초). 넘으면 끊고 다음 바퀴
 LOOP_LAP_TIMEOUT_SEC=2400
 
-# 모델: haiku / sonnet / opus / auto. 과부하 시 LOOP_FALLBACK_MODEL (claude --fallback-model)
-# auto = 바퀴마다 할 일을 보고 고른다 (loop/pick_model.py): 단순한 줄은 haiku, 돈·권한·설계는 opus, 나머지는 LOOP_MODEL_DEFAULT
-#   조각 줄에 〔모델: opus〕 처럼 적으면 그대로. 프로젝트 낱말은 loop/model_words.txt (opus: 낱말, 낱말 / haiku: 낱말)
-LOOP_MODEL="sonnet"
+# 모델: 평소 sonnet → 과부하 때 opus 로 대체 → 제일 어려운 일만 fable (v3.0.2)
+# 값: haiku / sonnet / opus / fable / auto. 과부하 시 LOOP_FALLBACK_MODEL (claude --fallback-model)
+# auto = 바퀴마다 할 일을 보고 고른다 (loop/pick_model.py): 단순한 줄은 haiku, 돈·권한·설계는 fable, 나머지는 LOOP_MODEL_DEFAULT. 2번 막히면 한 단계 위(sonnet→opus→fable)
+#   조각 줄에 〔모델: fable〕 처럼 적으면 그대로. 프로젝트 낱말은 loop/model_words.txt (fable: 낱말, 낱말 / opus: 낱말 / haiku: 낱말)
+LOOP_MODEL="auto"
 LOOP_MODEL_DEFAULT="sonnet"
 LOOP_FALLBACK_MODEL="opus"
+# fable 등급이 실제로 부르는 모델. Fable 을 못 쓰는 계정이면 "opus" 로 바꾼다
+LOOP_HARD_MODEL="claude-fable-5-2"
 
 # 노력 단계 (claude --effort): low / medium / high / xhigh / max. 비우면 claude 기본값
 # 평소엔 medium, 직전 바퀴가 일한 커밋 없이 끝났을 때만 RETRY 값으로 올린다 (비우면 안 올림)
