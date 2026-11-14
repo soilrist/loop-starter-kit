@@ -1,4 +1,4 @@
-# 루프 스타터 키트 v3.0.1 (확정)
+# 루프 스타터 키트 v3.0.2 (확정)
 
 **"이거 만들어!" 한마디면 알아서 만들고, 정말 필요할 때만 물어보는 AI 팀**을 프로젝트에 심는 키트예요. 게임뿐 아니라 앱·영상·자동화·문서 — 어떤 종류든 같은 틀로 돌아가요 (v3.0).
 
@@ -11,6 +11,11 @@
   - 🟢 알아서 해요.
   - 🟡 일단 하고 "이렇게 했어요"라고 알려요.
   - 🔴 방향, 돈, 삭제, 권리, 규칙, 사람만 할 수 있는 일(계정·결제)은 꼭 물어봐요. 숫자는 안 물어요 — 근거를 적고 알아서 정해요.
+
+## v3.0.2 에서 바뀐 것 — 모델 고르는 순서
+| 문제였던 것 | 이제 |
+|---|---|
+| 제일 좋은 모델(Fable)을 쓸 길이 없고, 일에 맞춰 고르는 기능(`auto`)이 꺼져 있었음 | `LOOP_MODEL="auto"` 가 기본. **평소 sonnet → 과부하 때 opus 로 대체 → 돈·권한·설계 같은 제일 어려운 줄만 fable.** 2번 막히면 한 단계 위(sonnet→opus→fable). 줄에 `〔모델: fable〕` 로 직접 지정, 프로젝트 낱말은 `loop/model_words.txt` 의 `fable:` 줄. Fable 을 못 쓰는 계정은 `env.sh` 의 `LOOP_HARD_MODEL="opus"` |
 
 ## v3.0.1 에서 바뀐 것 — 쓰던 세션들의 보고 반영
 | 문제였던 것 | 이제 |
@@ -29,7 +34,7 @@
 | 규칙·검사·말이 전부 게임 기준이라 영상·앱·자동화 프로젝트에서 안 맞음 | **프로필** `docs/profiles/` (game / app / content / automation / general). `CLAUDE.md` 의 `프로필:` 한 줄로 고르고, 그 문서 **하나만** 읽음. 검사 3층·쓰는 사람 눈·🔴 가 종류마다 다름 |
 | 어떤 말에 어떤 스킬·문서를 쓸지 정해진 게 없음 | `docs/conventions/Routing.md` — 말 → 길 표. 맞는 좁은 스킬이 없으면 `build-slice` 가 받음 |
 | 막히면 멈추거나 같은 걸 계속 되풀이 | `unblock` 스킬 — 사다리 여섯 칸(읽기 → 좁히기 → 다른 도구 → 찾기 → 돌아가기 → 넘기기). 그냥 멈추는 칸은 없음 |
-| 쉬운 조각도 비싼 모델로 돎 | `LOOP_MODEL="auto"` — `loop/pick_model.py` 가 조각 글을 보고 haiku/sonnet/opus 를 고름. 조각 줄에 `〔모델: opus〕` 로 직접 지정 가능, 헛바퀴 2번이면 한 단계 올림 |
+| 쉬운 조각도 비싼 모델로 돎 | `LOOP_MODEL="auto"` — `loop/pick_model.py` 가 조각 글을 보고 고름 (**v3.0.2 부터 기본값**): 평소 sonnet, 과부하 때 opus 로 대체, 돈·권한·설계 같은 제일 어려운 줄만 fable. 조각 줄에 `〔모델: fable〕` 로 직접 지정 가능, 헛바퀴 2번이면 한 단계 올림 |
 | 맥에서만 돎 (`python3`·launchd 고정) | 파이썬을 `python3`→`python`→`py` 순으로 찾음(`LOOP_PY`). `ctl.sh` 가 맥=launchd, 윈도우(Git Bash)=백그라운드 실행+작업 스케줄러, 그 밖=백그라운드 실행 |
 | 게임 엔진이 없으면 검사기가 Unity 로 가정 | `tools/check_conventions.py` 일반 모드 — 엔진 규칙은 건너뛰고 공통 규칙만 |
 | 설치된 키트가 몇 버전인지 알 수 없음 | `loop/KIT_VERSION` — `loop/ctl.sh status` 에 나옴 |
@@ -151,7 +156,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
 압축을 풀어 둔 뒤, **프로젝트 폴더를 연 Code 탭 세션**에 아래를 그대로 붙여넣으세요.
 
 ```
-루프 스타터 키트 v3.0.1 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
+루프 스타터 키트 v3.0.2 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
 키트의 README.md "설치 규칙"을 먼저 읽고 그대로 따라 줘.
 끝나면 결과를 5줄로 보고하고, 내가 정해야 할 것만 모아서 물어봐.
 루프는 아직 켜지 마.
@@ -197,19 +202,19 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
    - `command -v claude` 와 `~/.claude-loop-nc` 폴더가 있는지 확인해 보고한다.
    - `python3 tools/jev.py selftest` 가 `SELFTEST_OK` 인지 확인한다. `UNAVAILABLE` 이면 키·SDK(`~/.claude/scripts/.venv`) 문제 — 고치지 말고 보고만 (루프는 `통과(jev 미확인)` 로 돌 수 있음).
 9. **커밋**
-   - `chore(loop): 루프 스타터 키트 v3.0.1 설치` 로 커밋한다 (훅 통과 확인).
+   - `chore(loop): 루프 스타터 키트 v3.0.2 설치` 로 커밋한다 (훅 통과 확인).
    - 사람이 확인한 뒤에만 커밋한다.
 10. **보고**: 설치된 것 / 합친 파일 / 기존 위반 수 / 사람이 정할 것.
 
 ---
 
 ## 2.x 에서 올리기 (이미 키트를 쓰는 프로젝트)
-프로젝트 폴더를 연 Code 탭에 "루프 스타터 키트를 v3.0.1 으로 올려 줘. 키트 위치: 〔경로〕. README 의 '2.x 에서 올리기'대로." 라고 말하면 돼요. 올리는 AI 는:
+프로젝트 폴더를 연 Code 탭에 "루프 스타터 키트를 v3.0.2 으로 올려 줘. 키트 위치: 〔경로〕. README 의 '2.x 에서 올리기'대로." 라고 말하면 돼요. 올리는 AI 는:
 1. 루프가 돌고 있으면 `loop/ctl.sh wrapup` 으로 멈추고, 작업 트리가 깨끗한지 본다.
 2. **키트 것만 덮어쓴다**: `loop/`(단 `env.sh`·`mcp.json`·`model_words.txt` 는 프로젝트 것이니 새 항목만 손으로 옮긴다 — `LOOP_MODEL_DEFAULT`, 파이썬 찾기 블록) · `.githooks/` · `tools/check_conventions.py` · `.claude/skills/` · `docs/conventions/` · `docs/profiles/`(새로).
 3. **프로젝트 것은 덮어쓰지 않는다**: `docs/DESIGN.md`·`ROADMAP.md`·`STATUS.md`·`feedback/INBOX.md`·`CHANGELOG.md`·`CLAUDE.md` 의 프로젝트·함정 절. `CLAUDE.md` 에는 `프로필:` 줄과 규칙 8·9, 문서·스킬 표의 새 줄만 더하고, STATUS "지금 상태"에 `검사 명령` 줄을 더한다.
 4. 프로젝트에서 고쳐 쓴 컨벤션 문서가 있으면 덮기 전에 `git diff` 로 보고, 프로젝트만의 내용은 `CLAUDE.md` 함정이나 프로필 문서 "이 종류의 함정"으로 옮긴다.
-5. `bash loop/ctl.sh status` 에 `키트 : 3.0.1` 이 나오는지, `python3 tools/check_conventions.py --quiet` 가 통과하는지 확인하고 `chore(loop): 루프 스타터 키트 v3.0.1 으로 올림` 으로 커밋한다. 루프는 사람이 "켜"라고 할 때 켠다.
+5. `bash loop/ctl.sh status` 에 `키트 : 3.0.2` 이 나오는지, `python3 tools/check_conventions.py --quiet` 가 통과하는지 확인하고 `chore(loop): 루프 스타터 키트 v3.0.1 으로 올림` 으로 커밋한다. 루프는 사람이 "켜"라고 할 때 켠다.
 
 ## 2단계: 쓰는 법 (전부 Code 탭에서 말로)
 | 형이 할 말 | 일어나는 일 |

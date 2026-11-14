@@ -202,8 +202,10 @@ while :; do
   model="$LOOP_MODEL"
   if [ "$LOOP_MODEL" = "auto" ]; then
     model="$("$LOOP_PY" "$LOOP_DIR/pick_model.py" "$idle" "${LOOP_MODEL_DEFAULT:-sonnet}" 2>/dev/null)"
-    case "$model" in haiku|sonnet|opus) ;; *) model="${LOOP_MODEL_DEFAULT:-sonnet}" ;; esac
+    case "$model" in haiku|sonnet|opus|fable) ;; *) model="${LOOP_MODEL_DEFAULT:-sonnet}" ;; esac
   fi
+  # fable 등급 = 제일 어려운 일. 실제 모델 이름은 env.sh 의 LOOP_HARD_MODEL
+  [ "$model" = "fable" ] && model="${LOOP_HARD_MODEL:-claude-fable-5-2}"
 
   set -- -p "$prompt" --model "$model" --output-format stream-json --verbose
   [ -n "$effort" ] && set -- "$@" --effort "$effort"
