@@ -45,7 +45,7 @@ Inbox: 고블린 이동속도
 | 꼬리말 | 언제 | 예 |
 |---|---|---|
 | `Loop:` | 루프 커밋 **전부 필수**, 값 = 이번 바퀴 번호 (훅이 대조) | `Loop: 128` |
-| `Checks:` | 루프 커밋 중 `feat·fix·data·art·refactor·perf·test·build` 는 **필수** (훅이 검사) | `Checks: L1 pass, L2 pass, L3 skip(editor off)` |
+| `Checks:` | 루프 커밋 중 `feat·fix·data·art·refactor·perf·test·build` 는 **필수** (훅이 꼴까지 검사: 층마다 `pass`·`fail`·`skip(이유)`) | `Checks: L1 pass, L2 pass, L3 skip(editor off)` |
 | `Slice:` | ROADMAP 조각을 진행한 커밋이면 필수 (감독이 검수) | `Slice: M1-03` |
 | `Inbox:` | INBOX 항목을 처리한 커밋 | `Inbox: 고블린 이동속도` |
 

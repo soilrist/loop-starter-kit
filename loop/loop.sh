@@ -309,7 +309,11 @@ while :; do
 
   # STATUS 에 적힌 "통과(`인용`)" 이 실제 도구 출력에 있었는지 기계로 대조 (Verification.md 1 — jev 가 UNAVAILABLE 이어도 이건 돈다)
   if [ "$LOOP_DRY_RUN" != "1" ] && [ "$commits" != "0" ]; then
-    audit="$("$LOOP_PY" "$LOOP_DIR/lap_audit.py" check "$raw" "$pre" 2>&1)" || alert "바퀴 #$lap 검사 인용 불일치 — $audit"
+    if ! audit="$("$LOOP_PY" "$LOOP_DIR/lap_audit.py" check "$raw" "$pre" . "$lap" 2>&1)"; then
+      alert "바퀴 #$lap 검사 인용 불일치 — $audit"
+      # 경고만 남기면 아무도 다시 안 본다 — INBOX 맨 위 결함으로 올려 다음 바퀴가 먼저 고치게 한다
+      git add docs/feedback/INBOX.md && git commit -q -m "docs(inbox): #$lap 거짓 통과를 결함으로 올림 (감사)" -m "Loop: $lap" >> logs/tidy.log 2>&1 || alert "감사 결함 커밋 실패"
+    fi
     log "감사: $audit"
   fi
 

@@ -2,8 +2,9 @@
 """바퀴 기록 감사 — loop.sh 가 바퀴마다 부른다. 표준 라이브러리만.
 
   render <lap.jsonl>            일꾼의 최종 답 + 실행한 명령 목록을 사람이 읽을 글로 출력
-  check  <lap.jsonl> <pre-sha>  이번 바퀴가 STATUS 에 적은 "통과(`인용`)" 이 실제 도구 출력에 있는지 대조.
-                                없으면 사유를 출력하고 종료코드 1 (loop.sh 가 alerts.log 에 올림)
+  check  <lap.jsonl> <pre-sha> [루트 바퀴]  이번 바퀴가 STATUS 에 적은 "통과(`인용`)" 이 실제 실행 출력에 있고
+                                일꾼이 직접 쓴 글(echo·파일 쓰기)이 아닌지, "3층 통과" 가 적은 그림을 실제로 열었는지 대조.
+                                아니면 사유를 출력하고 종료코드 1. 루트를 주면 INBOX 맨 위에 `결함` 도 올린다
   usage  <lap.jsonl>            이번 바퀴의 `턴,새입력토큰,출력토큰,캐시읽기토큰,추정비용` 한 줄 (loop.sh 가 usage.csv 에 붙임).
                                 기록이 없으면 빈 칸 `,,,,` — 항상 종료코드 0
   report [usage.csv] [바퀴수]   최근 바퀴(기본 20)의 "일한 바퀴 하나당" 턴·토큰·추정비용, 헛바퀴가 쓴 몫,
@@ -108,21 +109,47 @@ def status_added_lines(pre_sha):
     return [l[1:] for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++")]
 
 
-def check_quotes(lines, tool_output):
-    """STATUS 에 새로 적힌 통과 인용 중 도구 출력에 없는 것 → 목록"""
-    hay = _squash(tool_output)
+def authored_text(events):
+    """이번 바퀴에 일꾼이 직접 쓴 글 — Bash 명령(커밋 제외)·Write/Edit 내용(STATUS 제외).
+    인용이 여기 있으면 실행 결과가 아니라 일꾼이 만든 글이다 (`echo "Passed: 3"` · 파일에 써 두고 cat)."""
+    parts = []
+    for ev in events:
+        if ev.get("type") != "assistant":
+            continue
+        for b in (ev.get("message") or {}).get("content") or []:
+            if not isinstance(b, dict) or b.get("type") != "tool_use":
+                continue
+            inp = b.get("input") or {}
+            if str(inp.get("file_path") or "").endswith("STATUS.md"):
+                continue
+            cmd = str(inp.get("command") or "")
+            if cmd and not re.search(r"\bgit\s+commit\b", cmd):
+                parts.append(cmd)
+            for k in ("content", "new_string"):
+                if inp.get(k):
+                    parts.append(str(inp[k]))
+    return "\n".join(parts)
+
+
+def check_quotes(lines, tool_output, authored=""):
+    """STATUS 에 새로 적힌 통과 인용 중 도구 출력에 없거나, 일꾼이 직접 타이핑한 것 → 목록"""
+    hay, typed = _squash(tool_output), _squash(authored)
     missing = []
     for l in lines:
         for q in PASS_RE.findall(l):
-            if _squash(q) not in hay:
+            sq = _squash(q)
+            if sq not in hay or (typed and sq in typed):
                 missing.append(q)
     return missing
 
 
-def saw_image(events):
-    """이번 바퀴에 그림을 실제로 열어 봤나 — Read 로 그림 파일을 열었거나, 도구 결과에 그림이 들어 있었나"""
+IMG_NAME_RE = re.compile(r"[\w./-]+\.(?:png|jpe?g|webp|gif|bmp)\b", re.I)
+
+
+def image_evidence(events):
+    """이번 바퀴에 실제로 열어 본 그림의 흔적 — Read 한 그림 경로, 그림을 돌려준 도구 호출의 입력 글"""
+    calls, seen = {}, []
     for ev in events:
-        t = ev.get("type")
         m = ev.get("message")
         content = m.get("content") if isinstance(m, dict) else None
         if not isinstance(content, list):
@@ -130,37 +157,67 @@ def saw_image(events):
         for b in content:
             if not isinstance(b, dict):
                 continue
-            if t == "assistant" and b.get("type") == "tool_use":
-                fp = str((b.get("input") or {}).get("file_path") or "").lower()
-                if b.get("name") == "Read" and fp.endswith(IMAGE_EXT):
-                    return True
-            elif t == "user" and b.get("type") == "tool_result":
+            if ev.get("type") == "assistant" and b.get("type") == "tool_use":
+                inp = b.get("input") or {}
+                calls[b.get("id")] = json.dumps(inp, ensure_ascii=False)
+                fp = str(inp.get("file_path") or "")
+                if b.get("name") == "Read" and fp.lower().endswith(IMAGE_EXT):
+                    seen.append(fp)
+            elif ev.get("type") == "user" and b.get("type") == "tool_result":
                 inner = b.get("content")
                 if isinstance(inner, list) and any(isinstance(x, dict) and x.get("type") == "image" for x in inner):
-                    return True
-    return False
+                    seen.append(calls.get(b.get("tool_use_id"), "(그림)"))
+    return seen
 
 
-def eye_claim_without_look(lines, looked):
-    """STATUS 에 새로 "3층 통과" 를 적었는데 이번 바퀴에 그림을 하나도 안 열었으면 True"""
-    return (not looked) and any(EYE_PASS_RE.search(l) for l in lines)
+def eye_problem(lines, evidence):
+    """"3층 통과" 줄마다: 어느 그림인지 적었나, 그 그림을 이번 바퀴에 실제로 열었나. 문제가 없으면 빈칸"""
+    for l in lines:
+        if not EYE_PASS_RE.search(l):
+            continue
+        named = [n.rsplit("/", 1)[-1].lower() for n in IMG_NAME_RE.findall(l)]
+        if not named:
+            return "STATUS 에 '3층 통과' 라 적었는데 어느 그림을 봤는지(captures/<파일>.png) 안 적음"
+        if not any(n in e.lower() for n in named for e in evidence):
+            return f"STATUS 의 '3층 통과' 가 적은 그림({', '.join(named)})을 이번 바퀴에 열어 보지 않음"
+    return ""
 
 
-def check(path, pre_sha):
+def add_defect(root, lap, reason):
+    """감사가 잡은 거짓 통과를 INBOX 맨 위 `결함` 으로 — 경고만 남기면 아무도 다시 안 본다"""
+    p = os.path.join(root, "docs/feedback/INBOX.md")
+    text = _read(p)
+    mark = "<!-- 여기 아래에 적는다 -->"
+    if not text or mark not in text:
+        return False
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    item = (f"- [ ] 결함(감사, {now}) **#{lap} 검사 기록이 실제 결과와 다름.** {reason[:200]} "
+            f"검사를 실제로 돌려 STATUS 의 그 줄을 고칠 것. 검증: `python3 loop/lap_audit.py check` 통과 / 삭제: 고친 커밋 후")
+    with open(p, "w", encoding="utf-8") as f:
+        f.write(text.replace(mark, mark + "\n" + item, 1))
+    return True
+
+
+def check(path, pre_sha, inbox_root=None, lap="?"):
     _, cmds, out = parse(path)
+    events = list(_events(path))
     lines = status_added_lines(pre_sha)
     quotes = sum(len(PASS_RE.findall(l)) for l in lines)
+    problem = ""
     if quotes and not cmds:
-        print(f"통과 인용 {quotes}개인데 도구 호출 기록이 0개 (jsonl 비었음?)")
+        problem = f"통과 인용 {quotes}개인데 도구 호출 기록이 0개 (jsonl 비었음?)"
+    else:
+        missing = check_quotes(lines, out, authored_text(events))
+        if missing:
+            problem = "STATUS 의 통과 인용이 실제 실행 출력에 없거나 일꾼이 직접 쓴 글임: " + " | ".join(m[:60] for m in missing)
+        else:
+            problem = eye_problem(lines, image_evidence(events))
+    if problem:
+        print(problem)
+        if inbox_root and add_defect(inbox_root, lap, problem):
+            print("→ INBOX 맨 위에 결함으로 올림")
         return 1
-    missing = check_quotes(lines, out)
-    if missing:
-        print("STATUS 의 통과 인용이 실제 도구 출력에 없음: " + " | ".join(m[:60] for m in missing))
-        return 1
-    if eye_claim_without_look(lines, saw_image(_events(path))):
-        print("STATUS 에 '3층 통과' 라 적었는데 이번 바퀴에 캡처를 하나도 열어 보지 않음 (눈 검사는 그림을 실제로 열었을 때만 통과)")
-        return 1
-    print(f"인용 {quotes}개 전부 도구 출력과 일치")
+    print(f"인용 {quotes}개 전부 실행 출력과 일치")
     return 0
 
 
@@ -543,15 +600,19 @@ def selftest():
     assert "턴 20.0" in rep and "$1.00" in rep, rep
     assert "$3.00 / $4.00 (75%)" in rep, rep
     assert report_lines([{"account": "dry"}]) == ["기록된 바퀴가 없음"]
-    # 눈 검사: 그림을 안 열고 "3층 통과" 라 쓰면 잡는다
-    read_img = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "captures/0007_ui_inventory.PNG"}}]}}]
-    tool_img = [{"type": "user", "message": {"content": [{"type": "tool_result", "content": [{"type": "image", "source": {}}]}]}}]
-    read_txt = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "docs/STATUS.md"}}]}}]
-    assert saw_image(read_img) and saw_image(tool_img) and not saw_image(read_txt), "그림을 열었는지 판정이 틀림"
-    assert not saw_image([{"type": "user", "message": "글자뿐인 메시지"}]), "message 가 글자일 때 죽으면 안 됨"
-    assert eye_claim_without_look(["검사: 1층 통과 / 3층 통과(레퍼런스 대조: docs/reference/inv.md)"], False)
-    assert not eye_claim_without_look(["검사: 1층 통과 / 3층 통과(레퍼런스 대조: docs/reference/inv.md)"], True)
-    assert not eye_claim_without_look(["검사: 1층 통과 / 3층 못 함(에디터 꺼짐)"], False), "못 함을 지적함"
+    # 눈 검사: 어느 그림인지 적고, 그 그림을 실제로 열었을 때만 "3층 통과"
+    read_img = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "r1", "name": "Read", "input": {"file_path": "captures/0007_ui_inventory.PNG"}}]}}]
+    tool_img = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s1", "name": "shot", "input": {"out": "captures/0008_hud.png"}}]}},
+                {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "s1", "content": [{"type": "image", "source": {}}]}]}}]
+    read_txt = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "r2", "name": "Read", "input": {"file_path": "docs/STATUS.md"}}]}}]
+    assert image_evidence(read_img) and image_evidence(tool_img) and not image_evidence(read_txt), "그림을 열었는지 판정이 틀림"
+    assert not image_evidence([{"type": "user", "message": "글자뿐인 메시지"}]), "message 가 글자일 때 죽으면 안 됨"
+    eye = "검사: 1층 통과 / 3층 통과(레퍼런스 대조: docs/reference/inv.md, captures/0007_ui_inventory.png)"
+    assert eye_problem([eye], image_evidence(read_img)) == "", "연 그림을 적었는데 지적함"
+    assert "열어 보지 않음" in eye_problem([eye], image_evidence(tool_img)), "다른 그림을 열고 적은 그림은 안 열었는데 통과시킴"
+    assert eye_problem([eye.replace("0007_ui_inventory", "0008_hud")], image_evidence(tool_img)) == "", "캡처 도구가 돌려준 그림을 인정 안 함"
+    assert "안 적음" in eye_problem(["3층 통과(레퍼런스 대조: docs/reference/inv.md)"], image_evidence(read_img)), "그림 이름 없는 3층 통과를 통과시킴"
+    assert eye_problem(["검사: 1층 통과 / 3층 못 함(에디터 꺼짐)"], []) == "", "못 함을 지적함"
     # 문서 살림: 넘친 것만 옮기고 한 줄도 버리지 않는다
     st = "# STATUS\n> 머리말\n\n## 지금 상태 (루프가 매 바퀴 갱신)\n" + "".join(f"- 항목 {i}\n  덧붙인 줄 {i}\n" for i in range(1, 21)) \
         + "\n---\n\n" + "".join(f"## #{n:04d} · 조각 M0-{n}\n- 한 것: {n}\n\n" for n in range(40, 0, -1))
@@ -590,6 +651,11 @@ def selftest():
     bad = ["검사: 1층 통과(`✔ 규칙 검사 통과 (경고 1)`)"]
     assert check_quotes(ok, out) == [], "일치하는 인용을 놓침"
     assert check_quotes(bad, out) == ["✔ 규칙 검사 통과 (경고 1)"], "없는 인용을 통과시킴"
+    fake = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": 'echo "Passed: 3, Failed: 0"'}}]}},
+            {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Edit", "input": {"file_path": "docs/STATUS.md", "new_string": ok[0]}}]}},
+            {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "git commit -m 'Checks: Passed: 3, Failed: 0'"}}]}}]
+    assert check_quotes(ok, out, authored_text(fake)) == ["Passed: 3, Failed: 0"], "echo 로 만든 인용을 통과시킴"
+    assert check_quotes(ok, out, authored_text(fake[1:])) == [], "STATUS 편집·커밋 메시지 속 인용을 지어낸 것으로 봄"
     ev = lambda i, c: {"type": "assistant", "message": {"id": i, "usage": {"input_tokens": 1, "cache_read_input_tokens": c, "output_tokens": 5}}}
     assert context_fields([ev("a", 99), ev("a", 99), ev("b", 199)]) == "100,200,2,300,10", "같은 id 두 줄은 한 번만 세야 함"
     assert context_fields([{"type": "result"}]) == "0,0,0,0,0", "호출 없는 기록"
@@ -605,8 +671,8 @@ if __name__ == "__main__":
     a = sys.argv[1:]
     if a[:1] == ["render"] and len(a) == 2:
         render(a[1])
-    elif a[:1] == ["check"] and len(a) == 3:
-        sys.exit(check(a[1], a[2]))
+    elif a[:1] == ["check"] and len(a) in (3, 5):
+        sys.exit(check(a[1], a[2], *(a[3:5])))
     elif a[:1] == ["usage"] and len(a) == 2:
         usage(a[1])
     elif a[:1] == ["context"] and len(a) == 2:

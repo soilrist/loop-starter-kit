@@ -41,8 +41,10 @@ if [ -n "${LOOP_LAP:-}" ]; then
   fi
   case "$first_line" in
     feat*|fix*|data*|art*|refactor*|perf*|test*|build*)
-      if ! grep -Eq '^Checks: .+' "$msg_file"; then
-        echo "✖ 커밋 거절: 이 타입의 루프 커밋에는 'Checks: L1 …, L2 …, L3 …' 꼬리말이 필요"
+      # 층마다 pass · fail · skip(이유) 셋 중 하나 — 아무 글이나 쓰면 거절 (STATUS 와의 대조는 lap_audit.py check)
+      v='(pass|fail|skip\([^)]+\))'
+      if ! grep -Eq "^Checks: L1 $v, L2 $v, L3 $v\$" "$msg_file"; then
+        echo "✖ 커밋 거절: 이 타입의 루프 커밋에는 'Checks: L1 pass, L2 fail, L3 skip(이유)' 꼴 꼬리말이 필요 (층마다 pass·fail·skip(이유))"
         exit 1
       fi ;;
   esac

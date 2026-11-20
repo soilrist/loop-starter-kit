@@ -16,7 +16,7 @@
 **이 종류의 🔴** — 스토어 제출·결제 상품 등록·세이브 형식을 호환 안 되게 바꾸기·핵심 재미(DESIGN §2) 바꾸기.
 
 **여는 문서·스킬**
-- 엔진: `docs/engines/<엔진>.md`, `docs/checks/<엔진>.md`
+- 엔진: `docs/engines/<엔진>.md`, `docs/checks/<엔진>.md` (Unity·Unreal·Godot·웹 — 웹은 three.js·캔버스 브라우저 게임)
 - 규칙: `conventions/Reference.md`, `AssetNaming.md`, `DataDriven.md`, `FolderStructure.md`
 - 스킬: `new-script` · `new-content` · `new-visual` · `reference-sheet`
 - 설계서: `docs/DESIGN.md` 는 GDD 로 쓴다 (§6 밸런스 숫자 포함)

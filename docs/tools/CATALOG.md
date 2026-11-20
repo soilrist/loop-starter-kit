@@ -2,13 +2,13 @@
 
 **다 깔려 있고, 다 꺼져 있다.** 이 프로젝트에 필요한 것만 켠다.
 
-> **무료만 쓴다.** 유료 API·크레딧(OpenAI·fal·Tripo·Meshy·Gemini·ElevenLabs·xAI·Scenario…)을 부르는 스킬은 `skills.sh on` 이 거부한다 (스킬 폴더에서 유료 키 이름을 찾아 막음). 풀려면 `on --paid` — 돈이라 🔴, 사람이 "써도 돼"라고 한 그 건만.
+> **무료만 쓴다.** 유료 API·크레딧(OpenAI·fal·Tripo·Meshy·Gemini·ElevenLabs·xAI·Scenario…)을 부르는 스킬은 `skills.sh on` 이 거부한다 (스킬 폴더에서 유료 키 이름을 찾아 막음). 풀려면 `on --paid` — 돈이라 🔴, 사람이 "써도 돼"라고 한 그 건만. 루프 일꾼(`LOOP_LAP` 있음)은 `--paid` 를 못 쓴다. 키는 이름 목록이 아니라 `*_API_KEY`·`*_API_TOKEN` 꼴로 찾으므로 목록에 없는 새 유료 키도 걸린다.
 
 - **서랍**: `~/.claude/skill-library/<owner>_<repo>/`. 클로드는 여기를 읽지 않으므로, 깔려 있어도 스킬 목록에 안 실린다.
 - **켜기**: `tools/skills.sh on <이름>`. `.claude/skills/<이름>` 에 링크가 생기고, 감독과 루프 일꾼 둘 다 그 스킬을 본다.
 - **끄기**: `tools/skills.sh off <이름>`. 링크만 지운다. 키트 자체 스킬(진짜 폴더)은 거부한다.
 - **보기**: `tools/skills.sh status` 는 켠 것만, `tools/skills.sh list <낱말>` 은 서랍 전체에서 찾는다. 이름이 겹치면 `저장소/이름` 으로 쓴다.
-- **켜는 때**: kickoff 0단계에서 프로필·엔진·아트 방향이 정해진 뒤, 아래 표에서 고른다.
+- **켜는 때**: kickoff 6단계("도구 켜기")에서, 엔진·아트 방향이 정해진 뒤, 아래 표에서 고른다.
 - **얼마나 켜나**: 일꾼에게는 **5개 안팎**. 켠 스킬의 설명은 매 호출에 실려 토큰을 먹는다.
 - **기록**: 켠 이유는 `CLAUDE.md` "만드는 도구" 칸에 한 줄 적는다.
 

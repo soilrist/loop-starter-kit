@@ -44,8 +44,8 @@ LOOP_TOOLS=""
 LOOP_PREFLIGHT_CMD=""
 LOOP_PREFLIGHT_SLEEP_SEC=600
 
-# 한 바퀴 비용 상한(달러, 비우면 제한 없음) — claude --max-budget-usd
-LOOP_MAX_BUDGET_USD=""
+# 한 바퀴 비용 상한(달러) — claude --max-budget-usd. 근거: sonnet 한 바퀴 보통 $0.5~2, fable 은 그 몇 배 → 정상 바퀴는 안 걸리고 헛바퀴만 $10 에서 끊김. 끄려면 ""
+LOOP_MAX_BUDGET_USD="10"
 
 # 계정 순서: 한도에 걸리면 다음 계정. "default" = 기본 로그인(개인 Max)
 # 팀 계정 폴더가 없으면 자동으로 건너뜀
