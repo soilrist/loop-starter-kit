@@ -1,4 +1,4 @@
-# 루프 스타터 키트 v3.0.2 (확정)
+# 루프 스타터 키트 v3.1.0 (확정)
 
 **"이거 만들어!" 한마디면 알아서 만들고, 정말 필요할 때만 물어보는 AI 팀**을 프로젝트에 심는 키트예요. 게임뿐 아니라 앱·영상·자동화·문서 — 어떤 종류든 같은 틀로 돌아가요 (v3.0).
 
@@ -11,6 +11,14 @@
   - 🟢 알아서 해요.
   - 🟡 일단 하고 "이렇게 했어요"라고 알려요.
   - 🔴 방향, 돈, 삭제, 권리, 규칙, 사람만 할 수 있는 일(계정·결제)은 꼭 물어봐요. 숫자는 안 물어요 — 근거를 적고 알아서 정해요.
+
+## v3.1.0 에서 바뀐 것 — 도구 서랍
+| 문제였던 것 | 이제 |
+|---|---|
+| 좋은 게임 도구(스프라이트·블렌더·three.js·영상→게임·웹 게임 시험)를 쓰려면 매번 찾아 깔아야 했음 | 17개 저장소, 스킬 434개를 `~/.claude/skill-library/` 서랍에 **다 깔아 두고 다 꺼 둠** — 클로드가 안 읽는 곳이라 토큰을 먹지 않음 |
+| 전부 켜면 스킬 설명이 매 호출에 실려 일꾼이 무거워짐 | `tools/skills.sh on/off/list/status` — 프로젝트에 필요한 것만 `.claude/skills/` 로 링크. 일꾼 설정(`--setting-sources project,local`)에서도 켠 것만 보임을 확인 |
+| 켜 둔 도구가 유료 API 를 몰래 부를 수 있음 | **무료만**: 유료 키(OpenAI·fal·Tripo·Gemini·ElevenLabs…)나 Scenario 크레딧을 쓰는 스킬은 `skills.sh on` 이 거부. 사람이 허락한 건만 `on --paid` |
+| 무엇을 켤지 기준이 없었음 | `docs/tools/CATALOG.md` — 단계별(기획·2D·3D·웹·검증) 표, 키·비용, 일꾼에 켜도 되나(✅/감독/참고). kickoff 6단계에서 골라 켬 |
 
 ## v3.0.2 에서 바뀐 것 — 모델 고르는 순서
 | 문제였던 것 | 이제 |
@@ -143,6 +151,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
 | `.claude/settings.json` | 위험 명령 차단 (`git add -A`, `push --force`, `rm -rf` …) |
 | `.githooks/` | 커밋 메시지 형식·규칙 위반을 **커밋 순간에 막음** |
 | `tools/check_conventions.py` | 이름·엔진별 사이드카 파일·코드 접두어·안 채운 숫자·레퍼런스 시트 유무 자동 검사 (점검한 규칙 목록 출력) |
+| `tools/skills.sh` · `docs/tools/CATALOG.md` | 도구 서랍(`~/.claude/skill-library`)의 스킬을 프로젝트에 켜고 끔 · 무엇을 켤지 표 |
 | `tools/jev.py` | Jev(TypeSafe System One) 제3 판정기 — `evidence`(통과 인용이 진짜인가) · `noise`(엔진 에러 줄이 잡음인가) · `verdict`(결함 지적이 진짜인가) · `selftest`. 키는 Keychain `typesafe-api-key` 또는 `TYPESAFE_API_KEY` |
 | `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기)·`watchdog.sh`(꺼진 루프 감시), `lap_audit.py`(바퀴 기록 렌더·STATUS 인용 대조·눈 검사 대조·턴/토큰/추정비용 집계·문서 크기 점검과 보관) |
 | `evals/` · `.claude-plugin/` | 키트 자체 시험용 (`claude plugin eval`) — **프로젝트에는 복사하지 않음** |
@@ -156,7 +165,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
 압축을 풀어 둔 뒤, **프로젝트 폴더를 연 Code 탭 세션**에 아래를 그대로 붙여넣으세요.
 
 ```
-루프 스타터 키트 v3.0.2 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
+루프 스타터 키트 v3.1.0 을 이 프로젝트(〔프로젝트 이름〕)에 설치해 줘. 키트 위치: 〔압축 푼 loop-starter-kit 폴더 경로〕
 키트의 README.md "설치 규칙"을 먼저 읽고 그대로 따라 줘.
 끝나면 결과를 5줄로 보고하고, 내가 정해야 할 것만 모아서 물어봐.
 루프는 아직 켜지 마.
@@ -194,7 +203,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
    - `python3 tools/check_conventions.py` 를 돌린다 (엔진 프로젝트가 하위 폴더면 `--root <폴더>`).
    - 기존 파일의 위반은 **지금 고치지 않는다.** 목록만 보여 주고, ROADMAP 맨 앞에 `M0-00 기존 파일 규칙 맞추기` 조각으로 넣는다. 파일 이동은 루프가 에디터·엔진 MCP 로 한다.
    - 7-1. **코드 그래프**: `command -v graphify` 가 있으면 `/graphify .` 로 `graphify-out/` 을 만들고 `.gitignore` 에 `/graphify-out/` 을 넣는다 (그래프는 커밋하지 않음). 없으면 이 단계는 건너뛰고 보고에 한 줄 적는다 — 루프는 그래프가 있을 때만 `graphify query` 를 쓴다. 갱신은 감독이 마일스톤 끝에 `/graphify . --update`.
-   - 7-2. **일꾼이 쓸 것은 프로젝트로**: 가벼운 바퀴의 일꾼은 사람 전역 스킬·플러그인·MCP 를 못 본다. ① 일꾼이 **엔진 MCP 로 일해야 하면**(예: Unity `unityMCP`) 그 서버 설정을 `loop/mcp.json` 에 적는다 — 루트 `.mcp.json` 과 `~/.claude.json` 것은 일꾼에게 안 간다. 명령줄·커맨드릿으로만 일하면 만들지 않는다. ② 전역(`~/.claude/skills`)의 엔진 스킬 중 **일꾼이 쓸 것만** 프로젝트 `.claude/skills/` 로 복사한다. 전부 넣지 않는다 — 스킬 목록은 모든 호출에 실린다. 감독만 쓰는 것(영상 보기 `watch` · 과설계 점검 · 그림 그리기)은 옮기지 않는다. ③ `CLAUDE.md` "프로젝트" 절의 "만드는 도구" 칸을 채운다. 확인은 `loop/ctl.sh status` 의 "일꾼 MCP" 줄.
+   - 7-2. **일꾼이 쓸 것은 프로젝트로**: 가벼운 바퀴의 일꾼은 사람 전역 스킬·플러그인·MCP 를 못 본다. ① 일꾼이 **엔진 MCP 로 일해야 하면**(예: Unity `unityMCP`) 그 서버 설정을 `loop/mcp.json` 에 적는다 — 루트 `.mcp.json` 과 `~/.claude.json` 것은 일꾼에게 안 간다. 명령줄·커맨드릿으로만 일하면 만들지 않는다. ② 전역(`~/.claude/skills`)의 엔진 스킬 중 **일꾼이 쓸 것만** 프로젝트 `.claude/skills/` 로 복사한다. 전부 넣지 않는다 — 스킬 목록은 모든 호출에 실린다. 감독만 쓰는 것(영상 보기 `watch` · 과설계 점검 · 그림 그리기)은 옮기지 않는다. ③ 게임 도구(스프라이트·블렌더·three.js 등)는 복사하지 말고 `tools/skills.sh on <이름>` 으로 켠다 — 고르는 표는 `docs/tools/CATALOG.md`, 보통 kickoff 6단계에서. ④ `CLAUDE.md` "프로젝트" 절의 "만드는 도구" 칸을 채운다. 확인은 `loop/ctl.sh status` 의 "일꾼 MCP" 줄.
 8. **루프 시험**
    - `loop/ctl.sh try` 로 claude 를 부르지 않는 시험 두 바퀴를 돌린다 (번호는 `logs/lap.dry` 에 따로 셈).
    - `logs/usage.csv` 에 `dry` 두 줄이 생겼는지 확인한다. `python3 loop/lap_audit.py selftest` 가 `SELFTEST_OK` 인지도 본다.
@@ -202,19 +211,19 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
    - `command -v claude` 와 `~/.claude-loop-nc` 폴더가 있는지 확인해 보고한다.
    - `python3 tools/jev.py selftest` 가 `SELFTEST_OK` 인지 확인한다. `UNAVAILABLE` 이면 키·SDK(`~/.claude/scripts/.venv`) 문제 — 고치지 말고 보고만 (루프는 `통과(jev 미확인)` 로 돌 수 있음).
 9. **커밋**
-   - `chore(loop): 루프 스타터 키트 v3.0.2 설치` 로 커밋한다 (훅 통과 확인).
+   - `chore(loop): 루프 스타터 키트 v3.1.0 설치` 로 커밋한다 (훅 통과 확인).
    - 사람이 확인한 뒤에만 커밋한다.
 10. **보고**: 설치된 것 / 합친 파일 / 기존 위반 수 / 사람이 정할 것.
 
 ---
 
 ## 2.x 에서 올리기 (이미 키트를 쓰는 프로젝트)
-프로젝트 폴더를 연 Code 탭에 "루프 스타터 키트를 v3.0.2 으로 올려 줘. 키트 위치: 〔경로〕. README 의 '2.x 에서 올리기'대로." 라고 말하면 돼요. 올리는 AI 는:
+프로젝트 폴더를 연 Code 탭에 "루프 스타터 키트를 v3.1.0 으로 올려 줘. 키트 위치: 〔경로〕. README 의 '2.x 에서 올리기'대로." 라고 말하면 돼요. 올리는 AI 는:
 1. 루프가 돌고 있으면 `loop/ctl.sh wrapup` 으로 멈추고, 작업 트리가 깨끗한지 본다.
 2. **키트 것만 덮어쓴다**: `loop/`(단 `env.sh`·`mcp.json`·`model_words.txt` 는 프로젝트 것이니 새 항목만 손으로 옮긴다 — `LOOP_MODEL_DEFAULT`, 파이썬 찾기 블록) · `.githooks/` · `tools/check_conventions.py` · `.claude/skills/` · `docs/conventions/` · `docs/profiles/`(새로).
 3. **프로젝트 것은 덮어쓰지 않는다**: `docs/DESIGN.md`·`ROADMAP.md`·`STATUS.md`·`feedback/INBOX.md`·`CHANGELOG.md`·`CLAUDE.md` 의 프로젝트·함정 절. `CLAUDE.md` 에는 `프로필:` 줄과 규칙 8·9, 문서·스킬 표의 새 줄만 더하고, STATUS "지금 상태"에 `검사 명령` 줄을 더한다.
 4. 프로젝트에서 고쳐 쓴 컨벤션 문서가 있으면 덮기 전에 `git diff` 로 보고, 프로젝트만의 내용은 `CLAUDE.md` 함정이나 프로필 문서 "이 종류의 함정"으로 옮긴다.
-5. `bash loop/ctl.sh status` 에 `키트 : 3.0.2` 이 나오는지, `python3 tools/check_conventions.py --quiet` 가 통과하는지 확인하고 `chore(loop): 루프 스타터 키트 v3.0.1 으로 올림` 으로 커밋한다. 루프는 사람이 "켜"라고 할 때 켠다.
+5. `bash loop/ctl.sh status` 에 `키트 : 3.1.0` 이 나오는지, `python3 tools/check_conventions.py --quiet` 가 통과하는지 확인하고 `chore(loop): 루프 스타터 키트 v3.1.0 으로 올림` 으로 커밋한다. 루프는 사람이 "켜"라고 할 때 켠다.
 
 ## 2단계: 쓰는 법 (전부 Code 탭에서 말로)
 | 형이 할 말 | 일어나는 일 |
