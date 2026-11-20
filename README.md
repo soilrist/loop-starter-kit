@@ -17,6 +17,7 @@
 |---|---|
 | 좋은 게임 도구(스프라이트·블렌더·three.js·영상→게임·웹 게임 시험)를 쓰려면 매번 찾아 깔아야 했음 | 17개 저장소, 스킬 434개를 `~/.claude/skill-library/` 서랍에 **다 깔아 두고 다 꺼 둠** — 클로드가 안 읽는 곳이라 토큰을 먹지 않음 |
 | 전부 켜면 스킬 설명이 매 호출에 실려 일꾼이 무거워짐 | `tools/skills.sh on/off/list/status` — 프로젝트에 필요한 것만 `.claude/skills/` 로 링크. 일꾼 설정(`--setting-sources project,local`)에서도 켠 것만 보임을 확인 |
+| 켜 둔 도구가 유료 API 를 몰래 부를 수 있음 | **무료만**: 유료 키(OpenAI·fal·Tripo·Gemini·ElevenLabs…)나 Scenario 크레딧을 쓰는 스킬은 `skills.sh on` 이 거부. 사람이 허락한 건만 `on --paid` |
 | 무엇을 켤지 기준이 없었음 | `docs/tools/CATALOG.md` — 단계별(기획·2D·3D·웹·검증) 표, 키·비용, 일꾼에 켜도 되나(✅/감독/참고). kickoff 6단계에서 골라 켬 |
 
 ## v3.0.2 에서 바뀐 것 — 모델 고르는 순서

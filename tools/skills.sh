@@ -3,12 +3,23 @@
 #   서랍 = ~/.claude/skill-library/<owner>_<repo>/ (클로드가 안 읽는 곳 — 깔려 있어도 꺼진 상태)
 #   켜기 = .claude/skills/<이름> 에 심볼릭 링크 → 감독·루프 일꾼 둘 다 보게 됨
 #   끄기 = 그 링크만 지움. 키트 자체 스킬(진짜 폴더)은 절대 안 건드린다.
-# 쓰는 법: tools/skills.sh list [낱말] | on <이름|저장소/이름>... | off <이름>... | status
+# 쓰는 법: tools/skills.sh list [낱말] | on [--paid] <이름|저장소/이름>... | off <이름>... | status
+# 무료만: 유료 API 키(OpenAI·fal·Tripo…)를 쓰는 스킬은 거부한다. --paid 는 사람이 돈 쓰기를 허락했을 때만 (🔴).
 # 무엇을 켤지는 docs/tools/CATALOG.md. 켠 스킬 설명은 매 호출에 실리니 조금만 켠다.
 set -euo pipefail
 LIB="${SKILL_LIBRARY:-$HOME/.claude/skill-library}"
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 DEST="$ROOT/.claude/skills"
+PAID_KEYS='OPENAI_API_KEY|FAL_KEY|TRIPO_API_KEY|MESHY_API_KEY|GEMINI_API_KEY|GOOGLE_API_KEY|ELEVENLABS_API_KEY|XAI_API_KEY|SCENARIO_SDK_API_KEY|SCENARIO_API|HEYGEN_API_KEY|ARK_API_KEY|SEED_AUDIO_API_KEY|ANTHROPIC_API_KEY|REPLICATE_API|STABILITY_API'
+FREE_OK=" threejs-game-director "  # 키가 있는지 확인만 하고 부르지 않음
+
+PAID_REPOS=" scenario-labs_skills "  # 키 이름 없이 유료 MCP 크레딧으로 도는 저장소
+
+paid_use() { # 유료 근거 한 줄 (없으면 빈칸)
+  case $FREE_OK in *" $2 "*) return 0 ;; esac
+  r=${1#"$LIB/"}; case $PAID_REPOS in *" ${r%%/*} "*) echo "$LIB/${r%%/*} (유료 MCP 크레딧)"; return 0 ;; esac
+  grep -rlE "$PAID_KEYS" "$1" --exclude-dir=node_modules --exclude-dir=.venv --exclude-dir=.git 2>/dev/null | head -1 || true
+}
 
 index() { # 저장소<TAB>이름<TAB>폴더
   [ -d "$LIB" ] || { echo "도구 서랍이 없음: $LIB (docs/tools/CATALOG.md '서랍 채우기' 참고)" >&2; exit 1; }
@@ -39,12 +50,17 @@ case $cmd in
       on = (system("test -L \"" dest "/" $2 "\"") == 0) ? "켜짐 " : "     "
       print on $1 "/" $2 }' ;;
   on)
+    paid=0; [ "${1:-}" = --paid ] && { paid=1; shift; }
     [ $# -gt 0 ] || { echo "on 뒤에 이름" >&2; exit 2; }
     mkdir -p "$DEST"
     for q in "$@"; do
       link="$DEST/${q#*/}"
       if [ -e "$link" ] && [ ! -L "$link" ]; then echo "거부: $link 는 키트·프로젝트 자체 스킬" >&2; exit 1; fi
       src=$(resolve "$q") || exit 1
+      f=$(paid_use "$src" "${q#*/}")
+      if [ -n "$f" ] && [ $paid = 0 ]; then
+        echo "거부(유료): $q 는 유료 API 를 부른다 — ${f#"$LIB/"}. 무료 대안을 CATALOG 에서 찾거나, 사람이 허락하면 on --paid" >&2; exit 1
+      fi
       ln -sfn "$src" "$link"; echo "켬: ${link#"$ROOT/"} → ${src#"$LIB/"}"
     done ;;
   off)

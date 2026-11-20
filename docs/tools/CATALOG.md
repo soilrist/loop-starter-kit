@@ -2,6 +2,8 @@
 
 **다 깔려 있고, 다 꺼져 있다.** 이 프로젝트에 필요한 것만 켠다.
 
+> **무료만 쓴다.** 유료 API·크레딧(OpenAI·fal·Tripo·Meshy·Gemini·ElevenLabs·xAI·Scenario…)을 부르는 스킬은 `skills.sh on` 이 거부한다 (스킬 폴더에서 유료 키 이름을 찾아 막음). 풀려면 `on --paid` — 돈이라 🔴, 사람이 "써도 돼"라고 한 그 건만.
+
 - **서랍**: `~/.claude/skill-library/<owner>_<repo>/`. 클로드는 여기를 읽지 않으므로, 깔려 있어도 스킬 목록에 안 실린다.
 - **켜기**: `tools/skills.sh on <이름>`. `.claude/skills/<이름>` 에 링크가 생기고, 감독과 루프 일꾼 둘 다 그 스킬을 본다.
 - **끄기**: `tools/skills.sh off <이름>`. 링크만 지운다. 키트 자체 스킬(진짜 폴더)은 거부한다.
@@ -15,15 +17,15 @@
 | 값 | 뜻 |
 |---|---|
 | ✅ | 루프 일꾼에 켜도 됨 |
-| 감독 | 돈이 들거나 사람 판단이 필요하다. 감독이 쓸 때만 켜고, 다 쓰면 바로 끈다(켜 두면 일꾼도 본다). 일꾼은 결과물만 쓴다. |
+| 감독 | 사람 판단이 필요하다. 감독이 쓸 때만 켜고 다 쓰면 끈다(켜 두면 일꾼도 본다). |
+| 💰 막힘 | 유료. `skills.sh` 가 거부한다. 같은 일은 무료 대안으로. |
 | 참고 | 켜지 않는다. 읽고 규칙만 가져온다. |
 
-**키 상태** (2026-11-20 기준)
+**무료 대안** — 그림·모델·소리를 돈 없이 만드는 길
 
-- 있음: `OPENAI_API_KEY`
-- 없음: `FAL_KEY` · `TRIPO_API_KEY` · `MESHY_API_KEY` · `GEMINI_API_KEY` · `ELEVENLABS_API_KEY` · `XAI_API_KEY` · `SCENARIO_SDK_API_KEY`
-
-키가 필요한 스킬은 키를 넣기 전까지 켜도 못 쓴다.
+- 3D·2D 그림: 블렌더 스크립트로 만들고 렌더해서 스프라이트로 뽑는다 (`blender-*`).
+- 웹 게임 그림: three.js 절차적 모델·셰이더 (`threejs-aaa-graphics-builder`).
+- 생성 AI 가 꼭 필요하면: RTX4090 노드의 로컬 모델(ComfyUI 등, 미설치) — 전기세만. 맥 로컬 추론은 금지.
 
 ## 1. 기획
 
@@ -38,8 +40,8 @@
 
 | 스킬 | 서랍 | 키·비용 | 일꾼 | 언제 |
 |---|---|---|---|---|
-| `sprite-gen` | aldegad_sprite-gen | OpenAI(있음) 또는 xAI. 장당 과금 | 감독 | 스프라이트 시트, 걷기·공격 프레임. CLI 는 `sprite-gen`. 돈이 드니 감독이 뽑고, 일꾼은 결과 PNG 만 쓴다. |
-| `scenario-*` (179개) | scenario-labs_skills | Scenario 키(없음) | 감독 | 생성 모델 조합. 키를 받으면 필요한 것 1~2개만 켠다. |
+| `sprite-gen` | aldegad_sprite-gen | OpenAI(있음) 또는 xAI. 장당 과금 | 💰 막힘 | 스프라이트 시트, 걷기·공격 프레임. CLI 는 `sprite-gen`. 돈이 드니 감독이 뽑고, 일꾼은 결과 PNG 만 쓴다. |
+| `scenario-*` (179개) | scenario-labs_skills | Scenario 키(없음) | 💰 막힘 | 생성 모델 조합. 키를 받으면 필요한 것 1~2개만 켠다. |
 | (도구) handsupmin_mono-pix | 서랍 | 없음 | 참고 | 단색 픽셀 아트 규칙 |
 
 ## 3. 3D·모션
@@ -48,7 +50,7 @@
 |---|---|---|---|---|
 | `blender-*` (28개: core·character-rigging·animation·retopology-uv·export-pipelines·game-optimization·asset-qa …) | EL4CTEO_blender-skills | 없음. Blender 는 `~/Desktop/Blender.app` | ✅ (필요한 것 2~3개) | 블렌더로 모델링·리깅·내보내기를 할 때. 보통 `blender-core` 와 그 일에 맞는 하나를 켠다. |
 | `build-rigged-game-assets` · `build-game-monster-system` | MengTo_Skills | 없음 | ✅ | 리깅된 캐릭터·몬스터의 규격(소켓·히트박스) |
-| `threejs-3d-generator` | majidmanzarpour_threejs-game-skills | Tripo(없음) | 감독 | 글이나 그림을 3D 로. 엔진과 무관하게 GLB/FBX 로 받는다. |
+| `threejs-3d-generator` | majidmanzarpour_threejs-game-skills | Tripo(없음) | 💰 막힘 | 글이나 그림을 3D 로. 엔진과 무관하게 GLB/FBX 로 받는다. |
 | GameFactory `asset_qa/*` | OpenDCAI_GameFactory-3A | 없음 | ✅ | 이미지·3D·모션·오디오 에셋 검수표 |
 | (GPU) Motion2MixamoRig · UniMate | 서랍 | GPU 필요 | 참고 | 맥에서 돌리지 않는다. RTX4090 노드에 설치해야 한다(미설치). |
 
@@ -57,9 +59,9 @@
 | 스킬 | 서랍 | 키·비용 | 일꾼 | 언제 |
 |---|---|---|---|---|
 | `threejs-game-director` (입구) + `threejs-gameplay-systems` · `threejs-aaa-graphics-builder` · `threejs-game-ui-designer` · `threejs-debug-profiler` · `threejs-qa-release` | majidmanzarpour_threejs-game-skills | 없음 | ✅ | three.js 게임 전반. director 와 지금 하는 일에 맞는 하나를 켠다. |
-| `threejs-image-generator` · `threejs-audio-generator` | 위와 같음 | Gemini · ElevenLabs(없음) | 감독 | 이미지·소리 생성 |
+| `threejs-image-generator` · `threejs-audio-generator` | 위와 같음 | Gemini · ElevenLabs(없음) | 💰 막힘 | 이미지·소리 생성 |
 | `create-game-vfx` · `build-game-camera-controls` · `build-game-audio-feedback` | MengTo_Skills | 없음 | ✅ | 이펙트·카메라·소리 피드백 |
-| `video-to-game` | lovisdotio_video-to-game | fal(없음). 영상 생성 과금 | 감독 | 생성 영상 프레임을 게임 화면 소스로 쓴다. 프로토타입·분위기 잡기용. |
+| `video-to-game` | lovisdotio_video-to-game | fal(없음). 영상 생성 과금 | 💰 막힘 | 생성 영상 프레임을 게임 화면 소스로 쓴다. 프로토타입·분위기 잡기용. |
 | `3dviz-pro-max` | viettranx_3dviz-pro-max | 없음 | ✅ | 설명용 3D 장면·인터랙티브 모델 |
 | (예제) LinearAbiltyCastingThreeJS · mykonos-island-voxels · 3d-vibe-coding-handbook | 서랍 | — | 참고 | 스킬 시전, 복셀 섬, 바이브 코딩 예제 코드 |
 
