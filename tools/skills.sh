@@ -11,7 +11,7 @@ LIB="${SKILL_LIBRARY:-$HOME/.claude/skill-library}"
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 DEST="$ROOT/.claude/skills"
 # 이름 목록이 아니라 꼴로 잡는다 — 목록에 없는 새 키(OPENROUTER_API_KEY 등)도 걸리게
-PAID_KEYS='\b[A-Z][A-Z0-9_]*_(API_KEY|API_TOKEN)\b|\bFAL_KEY\b|\bREPLICATE_API|\bSTABILITY_API|\bSCENARIO_API'
+PAID_KEYS='\b[A-Z][A-Z0-9_]*_(API_KEY|API_TOKEN)\b|\b(OPENAI|ANTHROPIC|GEMINI|XAI|GROQ|MISTRAL|ELEVENLABS|TRIPO|MESHY|FAL|RUNWAY|LUMA|SUNO|HF|HUGGINGFACE|REPLICATE|STABILITY|LEONARDO|KLING|SCENARIO|DEEPGRAM|COHERE|PERPLEXITY)_(KEY|TOKEN|SECRET)\b|\bAWS_SECRET_ACCESS_KEY\b|\bGOOGLE_APPLICATION_CREDENTIALS\b|\bREPLICATE_API|\bSTABILITY_API|\bSCENARIO_API'
 FREE_KEYS='^(ROBLOX[A-Z_]*|AUTH_SOURCE_API_KEY|SOME_API_KEY)$'  # 무료 서비스·예시 문자열
 FREE_OK=" majidmanzarpour_threejs-game-skills/threejs-game-director "  # 저장소/이름 — 키가 있는지 확인만 하고 부르지 않음
 
@@ -52,10 +52,13 @@ case $cmd in
     index | awk -F'\t' -v w="${1:-}" -v dest="$DEST" 'tolower($0) ~ tolower(w) {
       on = (system("test -L \"" dest "/" $2 "\"") == 0) ? "켜짐 " : "     "
       print on $1 "/" $2 }' ;;
+  on|off)
+    # 켜고 끄기는 감독이 바퀴 사이에 한다 (DIRECTOR.md) — 바퀴 도중 바뀐 링크는 바퀴 끝 지문 검사가 되돌린다. --paid(돈)는 🔴
+    if [ -n "${LOOP_LAP:-}" ]; then echo "거부: 루프 일꾼은 도구를 켜고 끄지 못한다 — 필요한 도구를 INBOX 에 질문으로 (감독이 바퀴 사이에 켬)" >&2; exit 1; fi ;;
+esac
+case $cmd in
   on)
     paid=0; [ "${1:-}" = --paid ] && { paid=1; shift; }
-    # 돈은 🔴 — 루프 일꾼은 스스로 풀 수 없다. 사람이 감독 대화에서 켠다.
-    if [ $paid = 1 ] && [ -n "${LOOP_LAP:-}" ]; then echo "거부: 루프 일꾼은 --paid 를 못 쓴다 (돈 = 🔴, INBOX 에 질문으로)" >&2; exit 1; fi
     [ $# -gt 0 ] || { echo "on 뒤에 이름" >&2; exit 2; }
     mkdir -p "$DEST"
     for q in "$@"; do

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# 루프 설정 — 여기만 고치면 다음 바퀴부터 적용 (재시작 필요 없음)
+# 루프 설정 — 바퀴 사이에 고친다(ctl.sh wrapup → 고침 → 커밋 → on). 바퀴 도중에 바꾸면 감사가 되돌린다
 # 사람이 직접 고칠 필요 없음: 감독에게 "30분마다로 바꿔줘" 라고 말하면 됨
 # ─────────────────────────────────────────────
 
@@ -35,6 +35,8 @@ LOOP_EFFORT_RETRY="high"
 # 왜: 루프가 안 쓰는 전역 설정이 바퀴의 모든 호출마다 다시 실린다. 줄었는지는 logs/context.csv · `loop/ctl.sh cost` 로 본다
 # 주의: 일꾼이 써야 하는 스킬은 전역이 아니라 프로젝트 .claude/skills/ 에 둔다 (전역 것은 일꾼 눈에 안 보인다)
 LOOP_LEAN=1
+# 일꾼 가두기: 1(기본)이면 macOS sandbox-exec 로 키트 보호 파일·.git/config·훅 폴더 쓰기를 OS 가 거절한다 (loop.sh SANDBOX). 0 은 시험용
+LOOP_SANDBOX=1
 # 가벼운 바퀴에서 일꾼이 쓰는 기본 도구 (비우면 loop.sh 기본 12개). 엔진 MCP 도구는 여기 말고 loop/mcp.json
 LOOP_TOOLS=""
 
@@ -57,6 +59,9 @@ LOOP_ACCOUNTS="$HOME/.claude-loop-nc default"
 LOOP_API_KEY_FILE="$HOME/.claude-loop-api-key"
 # API 바퀴 한 번의 비용 상한(달러, 비우면 LOOP_MAX_BUDGET_USD 만 적용)
 LOOP_API_MAX_BUDGET_USD=""
+# API 폴백 하루 누적 상한(달러, logs/usage.csv 의 오늘 api 바퀴 추정비용 합). 넘으면 그날은 API 로 안 돌고 쉰다.
+# 근거: 바퀴 상한 $10 × 3바퀴 — 구독 한도에 걸린 날 반나절만 메우고, 밤새 헛바퀴가 돌아도 $30 에서 멈춘다. 끄려면 ""
+LOOP_API_DAILY_USD="30"
 
 # 바퀴 사이 자동 정리: 1(기본)이면 STATUS·INBOX 가 한도를 넘을 때 루프가 스스로 오래된 기록(INBOX 는 끝난 항목·오래된 확인)을 docs/archive/ 로 옮기고 커밋
 LOOP_AUTO_TIDY=1
@@ -68,7 +73,7 @@ LOOP_IDLE_SLEEP_SEC=3600
 # 모든 계정이 한도일 때 쉬는 시간(초)
 LOOP_LIMIT_SLEEP_SEC=3600
 
-# 헤드리스 권한 — 위험 명령은 .claude/settings.json 의 deny 로 막혀 있음
+# 헤드리스 권한 — 일꾼의 위험 명령은 loop.sh lean_settings 의 deny 로 막힌다 (감독은 막지 않으려고 프로젝트 설정이 아니라 거기)
 LOOP_PERMISSION_FLAGS="--dangerously-skip-permissions"
 
 # claude 실행 파일 (자동 시작은 PATH 가 짧아서 직접 찾아 줌)

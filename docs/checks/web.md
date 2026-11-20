@@ -1,7 +1,7 @@
 # 검사 모듈: 웹 (three.js · 캔버스 · 브라우저 게임)
 
 > 공통 원칙은 `docs/conventions/Verification.md`. 여기엔 **브라우저 게임에서 실제로 어떻게** 만 적는다.
-> 도구: `tools/skills.sh on test-playable-web-games` (Playwright 로 실제 브라우저에서 끝까지 시험). Playwright 브라우저가 없으면 `npx playwright install chromium`.
+> 도구: `test-playable-web-games` 스킬 (Playwright 로 실제 브라우저에서 끝까지 시험). 켜기는 감독이 바퀴 사이에 `tools/skills.sh on test-playable-web-games` — 일꾼은 켜고 끄지 못하니(`skills.sh` 가 거부) 안 켜져 있으면 INBOX `질문`. Playwright 브라우저가 없으면 `npx playwright install chromium`.
 
 ## 1층 — 기계 검사 (커밋 전 필수)
 | 검사 | 명령 | 인용할 줄 |

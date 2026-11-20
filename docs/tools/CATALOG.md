@@ -2,7 +2,7 @@
 
 **다 깔려 있고, 다 꺼져 있다.** 이 프로젝트에 필요한 것만 켠다.
 
-> **무료만 쓴다.** 유료 API·크레딧(OpenAI·fal·Tripo·Meshy·Gemini·ElevenLabs·xAI·Scenario…)을 부르는 스킬은 `skills.sh on` 이 거부한다 (스킬 폴더에서 유료 키 이름을 찾아 막음). 풀려면 `on --paid` — 돈이라 🔴, 사람이 "써도 돼"라고 한 그 건만. 루프 일꾼(`LOOP_LAP` 있음)은 `--paid` 를 못 쓴다. 키는 이름 목록이 아니라 `*_API_KEY`·`*_API_TOKEN` 꼴로 찾으므로 목록에 없는 새 유료 키도 걸린다.
+> **무료만 쓴다.** 유료 API·크레딧(OpenAI·fal·Tripo·Meshy·Gemini·ElevenLabs·xAI·Scenario…)을 부르는 스킬은 `skills.sh on` 이 거부한다 (스킬 폴더에서 유료 키 이름을 찾아 막음). 풀려면 `on --paid` — 돈이라 🔴, 사람이 "써도 돼"라고 한 그 건만. 루프 일꾼(`LOOP_LAP` 있음)은 `on`·`off` 자체를 못 쓴다 — 켜고 끄기는 감독이 바퀴 사이에, 일꾼은 INBOX `질문` 으로 부탁한다. 판정기 `tools/jev.py`(TypeSafe)는 스킬이 아니라 키트 도구다 — 키가 없으면 `UNAVAILABLE` 로 빠지고 루프는 jev 없이 돈다 (README `tools/jev.py` 줄). 키는 이름 목록이 아니라 `*_API_KEY`·`*_API_TOKEN` 꼴로 찾으므로 목록에 없는 새 유료 키도 걸린다.
 
 - **서랍**: `~/.claude/skill-library/<owner>_<repo>/`. 클로드는 여기를 읽지 않으므로, 깔려 있어도 스킬 목록에 안 실린다.
 - **켜기**: `tools/skills.sh on <이름>`. `.claude/skills/<이름>` 에 링크가 생기고, 감독과 루프 일꾼 둘 다 그 스킬을 본다.

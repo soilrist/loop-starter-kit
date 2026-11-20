@@ -21,16 +21,90 @@ ROUTER_ENV_UNSET=(-u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_BASE
 # 왜: 이걸 빠뜨리면 컨텍스트 상한·자동 요약 기준이 풀려 바퀴가 220K 까지 불어난다 (Snarehaven #160 실측, 입력 2배).
 # 계정마다 설정 폴더가 다르므로 그 계정 것을 읽는다 (default = ~/.claude).
 lean_settings() {
-  "${LOOP_PY:-python3}" - "$1/settings.json" <<'PY'
+  "${LOOP_PY:-python3}" - "$1/settings.json" "${LOOP_LEAN:-1}" "${LOOP_DIR:-loop}" "${LOOP_API_KEY_FILE:-$HOME/.claude-loop-api-key}" <<'PY'
 import json, shutil, sys
 try: u = json.load(open(sys.argv[1]))
 except Exception: u = {}
-s = {k: u[k] for k in ("env", "autoCompactWindow") if k in u}
-if shutil.which("rtk"):
+sys.path.insert(0, sys.argv[3]); from lap_audit import secret_names
+ue = u.get("env") if isinstance(u.get("env"), dict) else {}
+bad = set(secret_names(list(ue)))
+# 사람 설정의 env 에 든 비밀 키는 일꾼에게 넘기지 않는다 (유료 API 를 부를 길을 막음 — 아래 SECRET_UNSET 과 같은 꼴)
+if sys.argv[2] == "1":   # 가벼운 바퀴: 사람 설정을 안 읽으니 필요한 값만 옮겨 온다
+    s = {k: u[k] for k in ("autoCompactWindow",) if k in u}
+    if ue: s["env"] = {k: v for k, v in ue.items() if k not in bad}
+else:                    # LOOP_LEAN=0: claude 가 사람 설정을 그대로 읽으니, 그 비밀 키만 빈 값으로 덮는다 (--settings 가 이긴다)
+    s = {"env": {k: "" for k in bad}} if bad else {}
+# 일꾼만 막을 것 (감독은 push·키트 수정을 해야 하므로 프로젝트 설정이 아니라 여기). 뚫려도 바퀴 뒤 lap_audit.py check 가 잡는다
+s["permissions"] = {"deny": ["Bash(git push:*)", "Bash(git -c core.hooksPath:*)", "Bash(git config core.hooksPath:*)",
+    "Bash(env -u LOOP_LAP:*)", "Bash(gh:*)", "Bash(unset LOOP_LAP:*)", "Bash(bash tools/skills.sh on --paid:*)", "Bash(tools/skills.sh on --paid:*)",
+    "Edit(./loop/**)", "Edit(./.githooks/**)", "Edit(./.claude/settings.json)", "Edit(./.claude/settings.local.json)", "Edit(./.claude/agents/**)",
+    "Edit(./tools/check_conventions.py)", "Edit(./tools/jev.py)", "Edit(./tools/skills.sh)", "Edit(./docs/conventions/**)",
+    "Edit(./CLAUDE.md)", "Edit(./.claude/skills/**)",
+    "Bash(bash tools/skills.sh on:*)", "Bash(tools/skills.sh on:*)", "Bash(bash tools/skills.sh off:*)", "Bash(tools/skills.sh off:*)",
+    "Read(/" + sys.argv[4] + ")", "Bash(cat " + sys.argv[4] + ":*)"]}  # 폴백 API 키 파일 — 같은 사용자라 완전히는 못 막는다 (README 알려진 한계)  # Edit 은 Write 도 막는다. `./` 없이 쓰면 안 막힘 (실측)
+if shutil.which("rtk") and sys.argv[2] == "1":
     s["hooks"] = {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "rtk hook claude"}]}]}
 print(json.dumps(s))
 PY
 }
+
+# 키트 파일 지문 — 일꾼이 Bash(sed -i 등)로 감사기·훅·상한을 고치고 커밋하지 않아도 바퀴 뒤에 잡는다
+GUARD_PATHS=(loop .githooks docs/conventions tools/check_conventions.py tools/jev.py tools/skills.sh .claude/settings.json .claude/settings.local.json .claude/agents CLAUDE.md)
+# 사본·바퀴 기록은 저장소 밖에 둔다 — 일꾼이 logs/ 의 기록이나 되돌림용 사본을 바꿔치지 못하게
+# ponytail: 같은 사용자라 $TMPDIR 를 뒤지면 찾을 수는 있다. 완전히 막으려면 일꾼을 다른 사용자로 돌려야 한다
+[ -n "${GUARD_DIR:-}" ] || { GUARD_DIR="$(mktemp -d)"; GUARD_TMP=1; }
+# 훅 영수증은 다른 임시 폴더 — 일꾼 환경변수로 보이는 경로가 되돌림 사본 위치를 알려주지 않게
+RECEIPT_DIR="$(mktemp -d)"; RECEIPT="$RECEIPT_DIR/hook.log"
+# 추적 안 되는 새 파일·.gitignore 로 숨긴 파일도 센다 (loop/ 에 새 스크립트를 두고 부르는 길). 멈춤 표시·잠금·캐시만 뺀다
+# OS 가 막는다 (macOS sandbox-exec): 일꾼은 같은 사용자라 정규식 탐지만으로는 늘 한 걸음 늦다 — 보호 파일·git 설정·훅 경로에
+# 쓰기 자체를 커널이 거절한다. 지문 검사·감사기는 그 뒤 두 번째 줄. STOP·WRAPUP·HOLD 만 일꾼이 쓸 수 있다. 끄기: LOOP_SANDBOX=0
+make_sandbox() {  # env.sh 를 읽은 뒤 바퀴마다 (LOOP_SANDBOX 를 바퀴 사이에 바꿀 수 있게)
+SANDBOX=()
+if [ "${LOOP_SANDBOX:-1}" = 1 ] && command -v sandbox-exec >/dev/null 2>&1; then
+  r="$(pwd -P)"; prof='(version 1)(allow default)(deny file-write*'
+  for g in "${GUARD_PATHS[@]}" .claude/skills .git/config .git/hooks .git/info; do prof="$prof (subpath \"$r/$g\")"; done
+  # 저장소 밖: 되돌림 사본(GUARD_DIR — 독을 넣으면 guard_restore 가 그걸 써 넣는다) · 감사기가 부르는 git·python3 를
+  # 가로챌 PATH 폴더 · git 전역 설정 · 셸 시작 파일. 일꾼은 원래 저장소 밖에 못 쓴다(PROMPT ③14)
+  local d pd; IFS=: read -ra pd <<< "$PATH"
+  for d in "$GUARD_DIR" "${pd[@]}" "$HOME/.gitconfig" "$HOME/.config/git" "$HOME"/.zsh{rc,env,profile} "$HOME"/.bash{rc,_profile} "$HOME/.profile"; do
+    [ -e "$d" ] || continue; d="$(cd "$d" 2>/dev/null && pwd -P || echo "$d")"
+    case "$d/" in "$r"/*) ;; *) prof="$prof (subpath \"$d\")";; esac
+  done
+  # 위 폴더째 옮겨 바꿔치기(mv tools t2 → 새 tools/jev.py)도 막는다 — 폴더 이름만 못 바꾸고 안에 새 파일은 만든다
+  for g in "" /tools /docs /.claude /.git; do prof="$prof (literal \"$r$g\")"; done
+  prof="$prof)(allow file-write*"
+  for g in STOP WRAPUP HOLD; do prof="$prof (literal \"$r/loop/$g\")"; done
+  SANDBOX=(sandbox-exec -p "$prof)")
+elif [ -z "${SANDBOX_WARNED:-}" ]; then
+  SANDBOX_WARNED=1; alert "가두기 꺼짐(LOOP_SANDBOX=0 또는 sandbox-exec 없음) — 키트 파일은 지문 검사로만 지킨다"
+fi
+}
+guard_files() { git ls-files -co -- "${GUARD_PATHS[@]}" | grep -vE '^loop/(STOP|WRAPUP|HOLD|\.lock)$|__pycache__/'; }
+guard_sum() { { guard_files | tr '\n' '\0' | xargs -0 shasum 2>/dev/null; ls -l .claude/skills 2>/dev/null | awk '{print $9, $10, $11}'; } | shasum | cut -c1-12; }
+guard_snap() { guard_files > "$GUARD_DIR/files.txt"; tr '\n' '\0' < "$GUARD_DIR/files.txt" | xargs -0 tar cf "$GUARD_DIR/guard.tar" 2>/dev/null; ls -A .claude/skills 2>/dev/null > "$GUARD_DIR/skills.txt"; }
+guard_restore() { # 바퀴 전 키트 파일로 되돌리고, 바퀴 동안 새로 생긴 파일·스킬 링크는 지운다
+  tar xf "$GUARD_DIR/guard.tar" 2>/dev/null
+  guard_files | while IFS= read -r f; do grep -qxF "$f" "$GUARD_DIR/files.txt" || rm -f "$f"; done
+  for l in .claude/skills/*; do [ -L "$l" ] && ! grep -qxF "$(basename "$l")" "$GUARD_DIR/skills.txt" && rm "$l"; done; return 0
+}
+# 한도 문구는 stderr 와 최종 결과 줄에서만 찾는다 — 실행한 명령·출력에 든 "quota"·"429" 로 계정을 넘기지 않게. render 전에 부른다
+# 일꾼 프로세스에만 주는 환경: 훅 영수증 위치 · git 원격 전송 전부 막음(push·fetch — 바퀴 일에 필요 없다)
+WORKER_ENV=(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.allow GIT_CONFIG_VALUE_0=never DISABLE_AUTOUPDATER=1)
+# 사람 셸의 키·토큰(폴백 키·GH_TOKEN·OPENAI_API_KEY…)은 일꾼에게 안 넘긴다. 구독 로그인 토큰만 남긴다
+# 목록은 env.sh 를 읽은 뒤(LOOP_PY 가 정해진 뒤) 바퀴마다 만든다 — secret_unset
+secret_unset() {
+  local names
+  names="$(env | cut -d= -f1 | "$LOOP_PY" "$LOOP_DIR/lap_audit.py" secrets)" || return 1   # 꼴은 lap_audit.py SECRET_RE
+  SECRET_UNSET=(-u FALLBACK_ANTHROPIC_API_KEY -u LOOP_API_KEY_FILE)
+  for v in $names; do SECRET_UNSET+=(-u "$v"); done
+}
+# 바퀴 기록·원격 ref 결과 확인 (빈 기록은 claude 가 못 뜬 것 — 그런데 커밋이 있으면 기록을 비운 것)
+raw_problem() {
+  if [ -s "$raw" ]; then head -5 "$raw" | grep -q '"subtype":"init"' || echo "바퀴 기록 첫 줄이 init 이 아님 — 기록이 잘렸거나 바뀜"
+  elif [ "$(git rev-list --count "$pre..HEAD")" != "0" ]; then echo "바퀴 기록이 비었는데 커밋이 있음 — 기록이 지워짐"; fi
+  [ "$(git for-each-ref refs/remotes | shasum)" = "$refs_pre" ] || echo "바퀴 동안 원격 ref 가 바뀜 — push·fetch 금지(PROMPT ③14)"
+}
+lim() { { cat "$out"; grep -h '"type":"result"' "$raw" 2>/dev/null; } | grep -Eiq "$1"; }
 
 LOCK="$LOOP_DIR/.lock"
 if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK" 2>/dev/null)" 2>/dev/null; then
@@ -38,7 +112,7 @@ if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK" 2>/dev/null)" 2>/dev/null; then
   exit 0
 fi
 echo $$ > "$LOCK"
-trap 'rm -f "$LOCK"' EXIT
+trap 'rm -f "$LOCK"; rm -r "$RECEIPT_DIR" 2>/dev/null; [ -n "${GUARD_TMP:-}" ] && rm -r "$GUARD_DIR" 2>/dev/null' EXIT
 
 log()   { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a logs/loop.log; }
 alert() {
@@ -109,7 +183,10 @@ while :; do
   # 설정은 매 바퀴 다시 읽는다 (재시작 없이 변경 반영)
   # shellcheck source=/dev/null
   . "$LOOP_DIR/env.sh"
+  make_sandbox
   [ -n "${LOOP_FORCE_SLEEP_SEC:-}" ] && LOOP_SLEEP_SEC="$LOOP_FORCE_SLEEP_SEC"
+  # 비밀 변수 목록을 못 만들면 키가 일꾼에게 샌다 — 그 바퀴는 돌리지 않는다
+  secret_unset || { alert "비밀 변수 목록을 못 만듦 ($LOOP_PY loop/lap_audit.py secrets 실패) — 루프 멈춤"; exit 1; }
 
   if [ -f "$LOOP_DIR/STOP" ]; then
     rm -f "$LOOP_DIR/WRAPUP"
@@ -139,7 +216,7 @@ while :; do
   if [ "$LOOP_DRY_RUN" != "1" ] && [ "${LOOP_AUTO_TIDY:-1}" = "1" ] && [ -z "$(git status --porcelain docs/ 2>/dev/null)" ]; then
     "$LOOP_PY" "$LOOP_DIR/lap_audit.py" tidy . > logs/tidy.log 2>&1 || true
     if [ -n "$(git status --porcelain docs/STATUS.md docs/feedback/INBOX.md docs/archive 2>/dev/null)" ]; then
-      if git add docs/STATUS.md docs/feedback/INBOX.md docs/archive && git commit -q -m "docs(status): 오래된 기록을 docs/archive 로 옮김 (자동 정리)" >> logs/tidy.log 2>&1; then
+      if git add docs/STATUS.md docs/feedback/INBOX.md docs/archive && env -u LOOP_LAP git commit -q -m "docs(status): 오래된 기록을 docs/archive 로 옮김 (자동 정리)" >> logs/tidy.log 2>&1; then
         log "자동 정리: STATUS·INBOX 의 오래된 기록을 보관함"
       else
         alert "자동 정리 커밋 실패 — logs/tidy.log 확인 (감독이 loop/ctl.sh tidy 로 마무리)"
@@ -186,9 +263,19 @@ while :; do
   echo "$lap" > "$LAP_FILE"
   export LOOP_LAP="$lap"
   pre="$(git rev-parse HEAD)"
+  # 바퀴 사이(지난 바퀴가 남긴 뒷일 프로세스 등)에 키트가 바뀌었으면 지문으로 삼기 전에 되돌린다
+  if [ -n "${guard_post:-}" ] && [ "$(guard_sum)" != "$guard_post" ]; then
+    guard_restore; alert "바퀴 사이에 키트 파일이 바뀜 — 지난 바퀴 끝 상태로 되돌림"
+  fi
+  guard_pre="$(guard_sum)"
+  guard_snap   # 고쳐졌으면 감사 전에 이걸로 되돌린다
+  refs_pre="$(git for-each-ref refs/remotes | shasum)"   # 바뀌면 바퀴 동안 push·fetch 가 있었다
+  : > "$RECEIPT"   # 훅 영수증 — 훅이 실제로 돈 커밋의 트리만 여기 남는다
+  # 훅이 꺼져 있으면 매 바퀴 다시 건다 (.git/config 는 지문 밖이라 한 번 꺼지면 계속 꺼진다)
+  [ "$(git config core.hooksPath)" = ".githooks" ] || { git config core.hooksPath .githooks; alert "훅이 꺼져 있어 다시 걸었음 (core.hooksPath)"; }
   started=$(date +%s)
   out="logs/lap-$(printf '%05d' "$lap").log"
-  raw="logs/lap-$(printf '%05d' "$lap").jsonl"   # 도구 호출·결과까지 전부 (감사용) — .log 는 사람이 읽는 요약
+  raw="$GUARD_DIR/lap.jsonl"   # 도구 호출·결과까지 전부 (감사용, 저장소 밖) — 감사 뒤 logs/lap-<n>.jsonl 로 복사. .log 는 사람이 읽는 요약
   ln -sf "$(basename "$out")" logs/lap-latest.log   # 고정 경로 — 감독·검사 스크립트가 파일 이름을 추측하지 않게
 
   prompt="너는 루프 일꾼이다. 바퀴 번호는 ${lap} 이다. loop/PROMPT.md 를 읽고 그 순서대로 이번 바퀴 하나만 수행하고 끝내라. 커밋 꼬리말 Loop: ${lap} 을 잊지 마라."
@@ -240,22 +327,23 @@ while :; do
       echo "[DRY] $LOOP_CLAUDE_BIN $*" > "$out"
       rc=0
     elif [ "$acct" = "default" ]; then
-      lean=(); [ "${LOOP_LEAN:-1}" = "1" ] && lean=(--settings "$(lean_settings "$HOME/.claude")")
-      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env -u CLAUDE_CONFIG_DIR "${ROUTER_ENV_UNSET[@]}" "$LOOP_CLAUDE_BIN" "$@" ${lean[@]+"${lean[@]}"} > "$raw" 2> "$out"
+      lean=(--settings "$(lean_settings "$HOME/.claude")")
+      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" ${SANDBOX[@]+"${SANDBOX[@]}"} env -u CLAUDE_CONFIG_DIR "${ROUTER_ENV_UNSET[@]}" "${SECRET_UNSET[@]}" "${WORKER_ENV[@]}" LOOP_HOOK_RECEIPT="$RECEIPT" "$LOOP_CLAUDE_BIN" "$@" ${lean[@]+"${lean[@]}"} > "$raw" 2> "$out"
       rc=$?
     else
-      lean=(); [ "${LOOP_LEAN:-1}" = "1" ] && lean=(--settings "$(lean_settings "$acct")")
-      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env "${ROUTER_ENV_UNSET[@]}" CLAUDE_CONFIG_DIR="$acct" "$LOOP_CLAUDE_BIN" "$@" ${lean[@]+"${lean[@]}"} > "$raw" 2> "$out"
+      lean=(--settings "$(lean_settings "$acct")")
+      run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" ${SANDBOX[@]+"${SANDBOX[@]}"} env "${ROUTER_ENV_UNSET[@]}" "${SECRET_UNSET[@]}" "${WORKER_ENV[@]}" LOOP_HOOK_RECEIPT="$RECEIPT" CLAUDE_CONFIG_DIR="$acct" "$LOOP_CLAUDE_BIN" "$@" ${lean[@]+"${lean[@]}"} > "$raw" 2> "$out"
       rc=$?
     fi
-    # 사람이 읽을 요약(.log) = stderr + 최종 답 + 실행한 명령 목록. 한도 문구 판정도 이 파일로.
+    hit=0; lim "$LIMIT_RE" && hit=1; uhit=0; lim "$USAGE_RE" && uhit=1
+    # 사람이 읽을 요약(.log) = stderr + 최종 답 + 실행한 명령 목록
     [ "$LOOP_DRY_RUN" = "1" ] || "$LOOP_PY" "$LOOP_DIR/lap_audit.py" render "$raw" >> "$out" 2>&1
 
     # 한도 = 한도 문구가 있고 + 실제로 커밋을 하나도 못 남겼을 때 (종료 코드만 믿지 않는다 — 0 으로 끝나며 한도 문구만 남긴 경우가 있었다)
-    if [ "$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)" = "0" ] && grep -Eiq "$LIMIT_RE" "$out"; then
+    if [ "$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)" = "0" ] && [ $hit = 1 ]; then
       log "계정 $used_account 한도 → 다음 계정 (rc=$rc)"
       note="limit:$used_account"
-      grep -Eiq "$USAGE_RE" "$out" && usage_limited=1
+      [ $uhit = 1 ] && usage_limited=1
       continue
     fi
     all_limited=0
@@ -267,15 +355,25 @@ while :; do
   # launchd 는 셸 환경변수를 넘기지 않으므로 파일($LOOP_API_KEY_FILE)에서도 읽는다
   api_key="${FALLBACK_ANTHROPIC_API_KEY:-}"
   [ -z "$api_key" ] && [ -f "${LOOP_API_KEY_FILE:-}" ] && api_key="$(tr -d ' \r\n' < "$LOOP_API_KEY_FILE")"
+  # 하루 누적 상한 — 바퀴 상한만으로는 한도 걸린 날 밤새 도는 API 바퀴를 못 막는다
+  api_today="$("$LOOP_PY" "$LOOP_DIR/lap_audit.py" api_today logs/usage.csv "$(date '+%Y-%m-%d')" "${LOOP_API_MAX_BUDGET_USD:-${LOOP_MAX_BUDGET_USD:-10}}" 2>/dev/null || echo 0)"
+  if [ -n "$api_key" ] && [ -n "${LOOP_API_DAILY_USD:-}" ] && awk -v a="${api_today:-0}" -v m="$LOOP_API_DAILY_USD" 'BEGIN{exit !(a>=m)}'; then
+    [ "$all_limited" = "1" ] && [ "$usage_limited" = "1" ] && alert "API 폴백 오늘 \$$api_today — 하루 상한 \$$LOOP_API_DAILY_USD 이라 쉼 (loop/env.sh LOOP_API_DAILY_USD)"
+    api_key=""
+  fi
   if [ "$LOOP_DRY_RUN" != "1" ] && [ "$all_limited" = "1" ] && [ "$usage_limited" = "1" ] && [ -n "$api_key" ]; then
     used_account="api"
     log "구독 한도 → API 키로 다시 (이 바퀴만, 다음 바퀴는 다시 구독부터)"
-    lean=(); [ "${LOOP_LEAN:-1}" = "1" ] && lean=(--settings "$(lean_settings "$HOME/.claude")")
-    budget=(); [ -n "${LOOP_API_MAX_BUDGET_USD:-}" ] && budget=(--max-budget-usd "$LOOP_API_MAX_BUDGET_USD")
-    run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" env -u CLAUDE_CONFIG_DIR "${ROUTER_ENV_UNSET[@]}" ANTHROPIC_API_KEY="$api_key" "$LOOP_CLAUDE_BIN" "$@" ${lean[@]+"${lean[@]}"} ${budget[@]+"${budget[@]}"} > "$raw" 2> "$out"
+    lean=(--settings "$(lean_settings "$HOME/.claude")")
+    # 이 바퀴 상한 = min(바퀴 상한, 하루 상한 − 오늘 쓴 돈) — 하루 상한 바로 밑에서 시작한 바퀴가 바퀴 상한만큼 넘기지 않게
+    cap="$(awk -v c="${LOOP_API_MAX_BUDGET_USD:-${LOOP_MAX_BUDGET_USD:-10}}" -v d="${LOOP_API_DAILY_USD:-}" -v a="${api_today:-0}" \
+      'BEGIN{ if (d != "" && d - a < c) c = d - a; printf "%.2f", c }')"
+    budget=(--max-budget-usd "$cap")
+    run_with_timeout "$LOOP_LAP_TIMEOUT_SEC" ${SANDBOX[@]+"${SANDBOX[@]}"} env -u CLAUDE_CONFIG_DIR "${ROUTER_ENV_UNSET[@]}" "${SECRET_UNSET[@]}" "${WORKER_ENV[@]}" LOOP_HOOK_RECEIPT="$RECEIPT" ANTHROPIC_API_KEY="$api_key" "$LOOP_CLAUDE_BIN" "$@" ${lean[@]+"${lean[@]}"} ${budget[@]+"${budget[@]}"} > "$raw" 2> "$out"
     rc=$?
+    hit=0; lim "$LIMIT_RE" && hit=1
     "$LOOP_PY" "$LOOP_DIR/lap_audit.py" render "$raw" >> "$out" 2>&1
-    if [ "$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)" = "0" ] && grep -Eiq "$LIMIT_RE" "$out"; then
+    if [ "$(git rev-list --count "$pre..HEAD" 2>/dev/null || echo 0)" = "0" ] && [ $hit = 1 ]; then
       log "API 키도 한도·오류 (rc=$rc)"
       note="${note} limit:api"
     else
@@ -308,14 +406,28 @@ while :; do
   fi
 
   # STATUS 에 적힌 "통과(`인용`)" 이 실제 도구 출력에 있었는지 기계로 대조 (Verification.md 1 — jev 가 UNAVAILABLE 이어도 이건 돈다)
-  if [ "$LOOP_DRY_RUN" != "1" ] && [ "$commits" != "0" ]; then
-    if ! audit="$("$LOOP_PY" "$LOOP_DIR/lap_audit.py" check "$raw" "$pre" . "$lap" 2>&1)"; then
+  # 커밋이 없어도 돈다 — 커밋 없이 끝난 우회(--paid 켜기 등)도 기록에 남는다
+  tamper=""
+  # 예외 표시 파일은 두지 않는다 — 일꾼도 만들 수 있으니 열쇠가 된다. 감독은 바퀴 사이(wrapup 뒤)에만 키트를 고친다 (DIRECTOR.md)
+  if [ "$LOOP_DRY_RUN" != "1" ] && [ "$(guard_sum)" != "$guard_pre" ]; then
+    # 감사기 자신이 고쳐졌을 수 있다 — 바퀴 전 키트 파일로 되돌린 뒤 감사한다
+    guard_restore
+    tamper="바퀴 동안 키트 파일(loop/·훅·검사기·.claude/skills 링크)이 바뀜 — 바퀴 전 상태로 되돌림. 규칙·도구를 바꾸려면 INBOX 에 질문"
+  fi
+  # 기록 첫 줄은 claude 의 init 이어야 한다 — 아니면 기록이 잘렸거나 바뀐 것
+  # 빈 기록은 claude 가 못 뜬 것(한도·오류) — 그런데 커밋이 있으면 기록을 비운 것
+  [ "$LOOP_DRY_RUN" = "1" ] || tamper="${tamper:-$(raw_problem)}"
+  [ -n "$tamper" ] && alert "바퀴 #$lap 키트·기록 변조 — $tamper"   # 감사기가 조용히 넘겨도 사람 눈엔 남는다
+  if [ "$LOOP_DRY_RUN" != "1" ]; then
+    if ! audit="$(LOOP_TAMPER="$tamper" LOOP_HOOK_RECEIPT="$RECEIPT" "$LOOP_PY" -I "$LOOP_DIR/lap_audit.py" check "$raw" "$pre" . "$lap" 2>&1)"; then
       alert "바퀴 #$lap 검사 인용 불일치 — $audit"
       # 경고만 남기면 아무도 다시 안 본다 — INBOX 맨 위 결함으로 올려 다음 바퀴가 먼저 고치게 한다
-      git add docs/feedback/INBOX.md && git commit -q -m "docs(inbox): #$lap 거짓 통과를 결함으로 올림 (감사)" -m "Loop: $lap" >> logs/tidy.log 2>&1 || alert "감사 결함 커밋 실패"
+      git add docs/feedback/INBOX.md docs/ROADMAP.md && git commit -q -m "docs(inbox): #$lap 거짓 통과를 결함으로 올리고 그 조각을 다시 엶 (감사)" -m "Loop: $lap" >> logs/tidy.log 2>&1 || alert "감사 결함 커밋 실패"
     fi
     log "감사: $audit"
   fi
+  [ "$LOOP_DRY_RUN" = "1" ] || guard_post="$(guard_sum)"   # 다음 바퀴 시작에 이것과 비교
+  cp "$raw" "logs/lap-$(printf '%05d' "$lap").jsonl" 2>/dev/null || true   # 사람이 볼 사본 (감사는 저장소 밖 원본으로 이미 끝남)
 
   # 매 바퀴 다시 읽히는 문서(STATUS "지금 상태"·INBOX)가 불었는지 — 하루에 한 번만 알린다
   if [ "$LOOP_DRY_RUN" != "1" ]; then
@@ -326,9 +438,9 @@ while :; do
   fi
 
   # 작업 트리에 커밋 안 된 루프 흔적이 남았는지
-  # 제외: loop/env.sh(감독 설정) · loop/ logs/ captures/tmp/ 의 추적 안 되는 파일(루프 자신의 상태 파일)
+  # 제외: loop/ logs/ captures/tmp/ 의 추적 안 되는 파일(루프 자신의 상태 파일)
   # 남은 파일 목록을 alerts.log 에 같이 적는다 — "매 바퀴 경고만 뜨고 원인을 모르는" 일이 없게
-  dirty="$(git status --porcelain 2>/dev/null | grep -vE ' loop/env\.sh$|^\?\? (loop/|logs/|captures/tmp/)')"
+  dirty="$(git status --porcelain 2>/dev/null | grep -vE '^\?\? (loop/|logs/|captures/tmp/)')"   # env.sh 도 본다 — 상한을 조용히 지우지 못하게
   if [ "$LOOP_DRY_RUN" != "1" ] && [ -n "$dirty" ]; then
     alert "바퀴 #$lap 뒤에 커밋 안 된 변경이 남음 — 감독 확인 필요"
     printf '%s\n' "$dirty" | sed 's/^/    /' >> logs/alerts.log

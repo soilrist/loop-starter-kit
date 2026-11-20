@@ -2,7 +2,7 @@
 
 > 공통 원칙은 `docs/conventions/AssetNaming.md` · `CodingStyle.md` · `FolderStructure.md` · `DataDriven.md`.
 > 여기엔 **웹에서 실제로 어떻게** 만 적는다. 검사 방법은 `docs/checks/web.md`.
-> 도구: `tools/skills.sh on threejs-game-director` (입구) + 지금 일에 맞는 `threejs-*` 하나. 표는 `docs/tools/CATALOG.md` 4절.
+> 도구: `threejs-game-director` (입구) + 지금 일에 맞는 `threejs-*` 하나 — 감독이 바퀴 사이에 `tools/skills.sh on` 으로 켠다 (일꾼은 못 켠다, 필요하면 INBOX `질문`). 표는 `docs/tools/CATALOG.md` 4절.
 
 ## 폴더
 | 무엇 | 어디 |

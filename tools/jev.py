@@ -12,19 +12,23 @@
 종료 코드: 0 = 긍정(SUPPORTED/KNOWN_NOISE/CONFIRMED) · 1 = 그 밖 · 2 = UNAVAILABLE(키·SDK·네트워크 없음)
 키: 환경변수 TYPESAFE_API_KEY, 없으면 macOS Keychain(service=typesafe-api-key). 평문 저장 안 함.
 """
+import os
+import sys
+
+if not sys.flags.isolated:  # -I: 스크립트 폴더(tools/json.py 같은 가짜 모듈)·PYTHONPATH 를 안 본다 — 판정 바꿔치기 막기
+    os.execv(sys.executable, [sys.executable, "-I", *sys.argv])
+
 import inspect
 import json
-import os
 import pathlib
 import subprocess
-import sys
 
 VENV_PY = pathlib.Path.home() / ".claude/scripts/.venv/bin/python3"
 try:
     from typesafe_sdk import Choice, Noul, TypeSafeClient
 except ImportError:
     if VENV_PY.exists() and pathlib.Path(sys.executable) != VENV_PY:
-        os.execv(str(VENV_PY), [str(VENV_PY), *sys.argv])  # ponytail: SDK 는 ~/.claude 의 venv 하나에만
+        os.execv(str(VENV_PY), [str(VENV_PY), "-I", *sys.argv])  # ponytail: SDK 는 ~/.claude 의 venv 하나에만
     print(json.dumps({"choice": "UNAVAILABLE", "reason": "typesafe_sdk 없음"}))
     sys.exit(2)
 
@@ -77,37 +81,31 @@ def evidence(claim: str, output: str, expect: str = "pass") -> dict:
     return {"choice": "SUPPORTED" if p >= EVIDENCE_P else "NOT_SUPPORTED", "p": round(p, 3), "model": r.model}
 
 
-def noise(engine: str, line: str) -> dict:
-    r = _ask(
-        {"engine": engine, "log_line": line},
-        Choice(
-            instructions=(
-                "`log_line` is one Error/Warning line from a headless run of the game engine named in `engine`. "
-                "KNOWN_NOISE = boilerplate the engine logs regardless of project code (missing default asset-manager "
-                "rules, experimental plugin notices, licensing/telemetry chatter, missing optional tooling). "
-                "NEEDS_REVIEW = plausibly caused by project code, assets, or configuration."
-            ),
-            criteria={"KNOWN_NOISE": None, "NEEDS_REVIEW": None},
-        ),
-    )
+def _choose(state, instructions, labels):
+    r = _ask(state, Choice(instructions=instructions, criteria=dict.fromkeys(labels)))
     c = r.choices["q"]
     return {"choice": c.choice, "p": round(c.confidence, 3), "model": r.model}
+
+
+def noise(engine: str, line: str) -> dict:
+    return _choose(
+        {"engine": engine, "log_line": line},
+        "`log_line` is one Error/Warning line from a headless run of the game engine named in `engine`. "
+        "KNOWN_NOISE = boilerplate the engine logs regardless of project code (missing default asset-manager "
+        "rules, experimental plugin notices, licensing/telemetry chatter, missing optional tooling). "
+        "NEEDS_REVIEW = plausibly caused by project code, assets, or configuration.",
+        ("KNOWN_NOISE", "NEEDS_REVIEW"),
+    )
 
 
 def verdict(finding: str) -> dict:
-    r = _ask(
+    return _choose(
         {"finding": finding},
-        Choice(
-            instructions=(
-                "`finding` is a code-review or QA finding with its evidence. CONFIRMED = a real defect shown by "
-                "concrete evidence (reproduction, output, exact code). PLAUSIBLE = could be real but unverified or "
-                "evidence is indirect. NOT_REAL = not a defect, or the evidence contradicts it."
-            ),
-            criteria={"CONFIRMED": None, "PLAUSIBLE": None, "NOT_REAL": None},
-        ),
+        "`finding` is a code-review or QA finding with its evidence. CONFIRMED = a real defect shown by "
+        "concrete evidence (reproduction, output, exact code). PLAUSIBLE = could be real but unverified or "
+        "evidence is indirect. NOT_REAL = not a defect, or the evidence contradicts it.",
+        ("CONFIRMED", "PLAUSIBLE", "NOT_REAL"),
     )
-    c = r.choices["q"]
-    return {"choice": c.choice, "p": round(c.confidence, 3), "model": r.model}
 
 
 def selftest() -> dict:
@@ -147,6 +145,9 @@ if __name__ == "__main__":
     except AssertionError as e:
         print(json.dumps({"choice": "SELFTEST_FAIL", "cases": e.args[0]}, ensure_ascii=False))
         sys.exit(1)
+    except (ValueError, TypeError) as e:  # 잘못 부름(인자 틀림) — '못 씀(UNAVAILABLE)' 으로 둔갑해 미확인 통과가 되지 않게
+        print(json.dumps({"choice": "USAGE_ERROR", "reason": f"{type(e).__name__}: {e}"[:200]}, ensure_ascii=False))
+        sys.exit(3)
     except Exception as e:  # 키 없음·네트워크·429 — 루프를 죽이지 않고 '미확인'으로
         print(json.dumps({"choice": "UNAVAILABLE", "reason": f"{type(e).__name__}: {e}"[:200]}, ensure_ascii=False))
         sys.exit(2)

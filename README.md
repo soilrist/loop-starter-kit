@@ -21,7 +21,10 @@
 | 커밋 `Checks:` 에 아무 글이나 | 층마다 `pass`·`fail`·`skip(이유)` 꼴이 아니면 훅이 거절 |
 | 일꾼이 `skills.sh on --paid` 로 유료를 스스로 켤 수 있었음 · 목록에 없는 키는 통과 | 일꾼은 `--paid` 거부 · `*_API_KEY` 꼴로 찾음 |
 | 웹(three.js) 게임 문서 없음 | `docs/engines/web.md` · `docs/checks/web.md` |
-| 바퀴 비용 상한 없음 | `LOOP_MAX_BUDGET_USD="10"` 기본 |
+| 바퀴 비용 상한 없음 | `LOOP_MAX_BUDGET_USD="10"` 기본 · API 폴백은 하루 누적 `LOOP_API_DAILY_USD="30"` 넘으면 그날 쉼 |
+| 인용 없이 "1층 통과"만 써도, 커밋에 `Checks: L1 pass` 만 써도 통과 | 맨 "N층 통과"·STATUS 인용 없는 `pass`·8글자 미만 인용은 결함 |
+| 거짓 통과로 `[x]` 친 조각이 그대로 완료 | 감사가 걸리면 그 바퀴의 ROADMAP `[x]` 를 `[ ]` 로 되돌림 |
+| 일꾼이 `env -u LOOP_LAP`·`--no-verify`·`core.hooksPath` 로 훅을 피하거나 `loop/`·훅·검사기를 고칠 수 있었음 | 일꾼 권한 deny 23줄(`loop.sh` lean_settings — 셀프테스트가 목록을 못 박음)로 막고, 훅이 키트 파일 커밋을 거절하고, 바퀴 끝 감사가 명령 기록·커밋에서 흔적을 찾아 결함으로 올림 (커밋 0개 바퀴도 감사) |
 
 ## v3.1.0 에서 바뀐 것 — 도구 서랍
 | 문제였던 것 | 이제 |
@@ -72,7 +75,7 @@
 ## v2.2 에서 바뀐 것
 | 문제였던 것 | 이제 |
 |---|---|
-| 바퀴 로그에 최종 답만 남아 "명령이 정말 돌았나" 대조 불가 | `loop.sh` 가 도구 호출·출력을 `logs/lap-<n>.jsonl` 로 남기고, 바퀴 끝에 `loop/lap_audit.py check` 가 STATUS 의 모든 `통과(\`인용\`)` 을 실제 출력과 대조 — 지어낸 인용은 `alerts.log` "검사 인용 불일치" |
+| 바퀴 로그에 최종 답만 남아 "명령이 정말 돌았나" 대조 불가 | `loop.sh` 가 도구 호출·출력을 저장소 밖 임시 폴더에 받아 바퀴 끝에 `loop/lap_audit.py check` 로 감사하고(사람이 볼 사본은 `logs/lap-<n>.jsonl`), 감사기가 STATUS 의 모든 `통과(\`인용\`)` 을 실제 출력과 대조 — 지어낸 인용은 `alerts.log` "검사 인용 불일치" |
 | Jev 가 역검증("일부러 깨서 잡혔다") 인용을 항상 NOT_SUPPORTED | `tools/jev.py evidence "<주장>" "<인용>" fail` 세 번째 인자 (Snarehaven 실측 버그) |
 | graphify 규칙이 없는 폴더(`graphify/`)를 가리킴 | `graphify-out/graph.json` 기준으로 통일, 설치 규칙 7-1 에서 그래프 생성, 감독이 마일스톤 끝에 `--update` |
 | `develop` 이 아니면 `ctl.sh on` 이 거부 | 작업 트리가 깨끗하면 `develop` 로 옮기거나 만들어 줌 |
@@ -163,7 +166,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
 | `.githooks/` | 커밋 메시지 형식·규칙 위반을 **커밋 순간에 막음** |
 | `tools/check_conventions.py` | 이름·엔진별 사이드카 파일·코드 접두어·안 채운 숫자·레퍼런스 시트 유무 자동 검사 (점검한 규칙 목록 출력) |
 | `tools/skills.sh` · `docs/tools/CATALOG.md` | 도구 서랍(`~/.claude/skill-library`)의 스킬을 프로젝트에 켜고 끔 · 무엇을 켤지 표 |
-| `tools/jev.py` | Jev(TypeSafe System One) 제3 판정기 — `evidence`(통과 인용이 진짜인가) · `noise`(엔진 에러 줄이 잡음인가) · `verdict`(결함 지적이 진짜인가) · `selftest`. 키는 Keychain `typesafe-api-key` 또는 `TYPESAFE_API_KEY` |
+| `tools/jev.py` | Jev(TypeSafe System One) 제3 판정기 — `evidence`(통과 인용이 진짜인가) · `noise`(엔진 에러 줄이 잡음인가) · `verdict`(결함 지적이 진짜인가) · `selftest`. 키는 Keychain `typesafe-api-key` 또는 `TYPESAFE_API_KEY`. **무료만 원칙과의 관계**: jev 는 사람이 이미 가진 TypeSafe 키로 도는 판정 1건짜리 호출이라 스킬 서랍의 유료 생성 도구(💰 막힘)와 따로 둔다. 키가 없거나 쓰기 싫으면 jev 는 `UNAVAILABLE` 을 내고 루프는 ``통과(`인용`, jev 미확인)`` 로 계속 돈다 — 인용 대조·감사는 jev 없이도 그대로 |
 | `loop/` | `PROMPT.md`(일꾼), `DIRECTOR.md`(비서), `loop.sh`·`env.sh`·`ctl.sh`(맥 launchd 실행기)·`watchdog.sh`(꺼진 루프 감시), `lap_audit.py`(바퀴 기록 렌더·STATUS 인용 대조·눈 검사 대조·턴/토큰/추정비용 집계·문서 크기 점검과 보관) |
 | `evals/` · `.claude-plugin/` | 키트 자체 시험용 (`claude plugin eval`) — **프로젝트에는 복사하지 않음** |
 | `docs/DESIGN.md` `ROADMAP.md` `STATUS.md` `feedback/INBOX.md` | 기획서·조각 목록·바퀴 기록·우편함 |
@@ -220,7 +223,7 @@ Snarehaven 에서 쓰던 키트(그쪽 이름으로 v2.3.0·v2.3.1, 2026-09-23)�
    - `logs/usage.csv` 에 `dry` 두 줄이 생겼는지 확인한다. `python3 loop/lap_audit.py selftest` 가 `SELFTEST_OK` 인지도 본다.
    - 이미 루프가 돌던 프로젝트를 올리는 경우: 옛 `loop/env.sh` 에 `LOOP_EFFORT`·`LOOP_EFFORT_RETRY` 두 줄이 없으면 키트의 값을 옮겨 적는다 (없어도 루프는 돌고, 노력 단계만 claude 기본값이 된다).
    - `command -v claude` 와 `~/.claude-loop-nc` 폴더가 있는지 확인해 보고한다.
-   - `python3 tools/jev.py selftest` 가 `SELFTEST_OK` 인지 확인한다. `UNAVAILABLE` 이면 키·SDK(`~/.claude/scripts/.venv`) 문제 — 고치지 말고 보고만 (루프는 `통과(jev 미확인)` 로 돌 수 있음).
+   - `python3 tools/jev.py selftest` 가 `SELFTEST_OK` 인지 확인한다. `UNAVAILABLE` 이면 키·SDK(`~/.claude/scripts/.venv`) 문제 — 고치지 말고 보고만 (루프는 ``통과(`인용`, jev 미확인)`` 로 돌 수 있음 — 인용은 여전히 필수).
 9. **커밋**
    - `chore(loop): 루프 스타터 키트 v3.1.1 설치` 로 커밋한다 (훅 통과 확인).
    - 사람이 확인한 뒤에만 커밋한다.
@@ -264,6 +267,17 @@ env ANTHROPIC_BASE_URL=https://api.anthropic.com ANTHROPIC_AUTH_TOKEN= ANTHROPIC
 6. 2~3번 고쳐도 안 오르는 케이스는 규칙이 아니라 **케이스나 채점 기준(`graders/criteria.md`)이 틀렸을 수 있다** — 그쪽을 먼저 다시 읽는다.
 
 실제 루프의 설정(모델·노력 단계·쉬는 시간)은 eval 이 아니라 `loop/ctl.sh cost` 의 전후 비교로 같은 순서를 따른다 (`loop/DIRECTOR.md` 감시 & 검수 5).
+
+## 알려진 한계 (감사가 못 막는 것)
+일꾼은 감독과 **같은 맥 사용자**로 돈다. 그래서 아래는 장치로 완전히 막지 못하고, 감사가 흔적을 잡거나 사람이 본다. 단 **키트 파일 쓰기는 OS 가 막는다** — macOS 에서 일꾼은 `sandbox-exec` 안에서 돌아 `loop/`·`.githooks/`·검사기·`CLAUDE.md`·`.claude/settings*`·`.claude/skills`·`.git/config`·훅 폴더, 저장소 밖의 되돌림 사본·PATH 폴더·git 전역 설정·셸 시작 파일에 쓰기가 거절된다(`loop.sh` make_sandbox, 끄기 `LOOP_SANDBOX=0`). 다른 OS 는 지문 검사·되돌림만.
+| 한계 | 지금 막는 정도 | 완전히 막으려면 |
+|---|---|---|
+| 저장소 밖 감사 폴더(`$TMPDIR` 의 임시 폴더) — 찾으면 기록·사본을 바꿀 수 있다 | macOS 는 되돌림 사본·바퀴 기록 폴더 쓰기를 가두기가 거절(영수증 폴더는 훅이 써야 해서 열려 있음) · 폴더 이름이 켤 때마다 무작위 · 일꾼에게 알리는 건 영수증 폴더뿐(사본 폴더와 다름) · 영수증 위조 명령(`write-tree`·`LOOP_HOOK_RECEIPT`)은 우회로 감사 · 빈 기록에 커밋이 있으면 결함 · 변조는 감사와 따로 `alerts.log` 에 | 일꾼을 다른 사용자(또는 컨테이너)로 |
+| API 폴백 바퀴엔 키가 일꾼 환경(`ANTHROPIC_API_KEY`)에 있다. 키 파일(`~/.claude-loop-api-key`)도 같은 사용자라 읽을 수 있다. 하루 상한은 저장소 안 `logs/usage.csv` 로 센다 | 키 파일은 `Read`·`cat` deny · 그 바퀴 상한 = min(바퀴 상한, 하루 상한 − 오늘 쓴 돈)으로 늘 `--max-budget-usd` 전달 · 평소 바퀴엔 사람 셸과 사람 settings.json `env`(`LOOP_LEAN=0` 이어도 빈 값으로 덮음) 의 `*_KEY*`·`*_TOKEN*`·`*SECRET*`·`*_PAT`·`*PASSWORD*` 꼴 변수(`lap_audit.py` SECRET_RE)와 폴백 키를 일꾼에게 안 넘김 — 구독 로그인 토큰과 jev 키(`TYPESAFE_API_KEY`)만 남김 · 바퀴 상한 `--max-budget-usd` 는 claude 가 지킴 | 프록시가 키를 쥐고 일꾼엔 안 줌 |
+| URL 을 직접 써서 push (`git push https://…`) | git 원격 전송 전부 꺼 둠(`protocol.allow=never`) · 원격 ref 변화·우회 명령 감사 | 네트워크 차단 |
+| 셸 밖 언어로 git 내부를 직접 쓰기 | 훅 영수증에 없는 `Loop:` 커밋은 결함 | 위와 같음 |
+| 계산으로 만든 가짜 출력(예: 테스트 대신 아무 스크립트가 `Passed: 3` 을 찍음) | `echo`·`python -c`·옛 기록 읽기 출력은 근거에서 뺌 · jev 가 주장과 출력을 대조 · 감독 검수 | 검사 명령을 키트가 고정해 직접 돌림 |
+| `gh`·`curl` 로 GitHub 에 쓰기 | `gh` 는 deny + 우회 감사 · 토큰 변수는 일꾼에게 안 넘김 | 네트워크 차단 |
 
 ## 출처
 - Unity `.gitignore`: github/gitignore
