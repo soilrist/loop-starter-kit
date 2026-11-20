@@ -172,6 +172,7 @@ case "${1:-status}" in
     echo "실행 중   : ${pid:-아니오}"
     echo "STOP/WRAPUP: $( [ -f "$LOOP_DIR/STOP" ] && echo STOP ) $( [ -f "$LOOP_DIR/WRAPUP" ] && echo WRAPUP )"
     echo "감시      : $(watchdog_on && echo 켬 || echo 꺼짐)$( [ -f "$LOOP_DIR/HOLD" ] && echo " (HOLD — 일부러 세움)")"
+    echo "가두기    : $( [ "${LOOP_SANDBOX:-1}" = 1 ] && command -v sandbox-exec >/dev/null 2>&1 && echo "켬 (sandbox-exec — 키트 파일 쓰기는 OS 가 거절)" || echo "꺼짐 — 키트 파일은 지문 검사로만 지킨다")"
     echo "마지막 바퀴: $(cat logs/lap 2>/dev/null || echo 0)"
     echo "설정      : 모델 $LOOP_MODEL / 노력 ${LOOP_EFFORT:-기본}(막히면 ${LOOP_EFFORT_RETRY:-그대로}) / 쉬는 시간 ${LOOP_SLEEP_SEC}초 / 계정 $LOOP_ACCOUNTS / 가벼운 바퀴 $([ "${LOOP_LEAN:-1}" = "1" ] && echo 켬 || echo 끔)"
     if [ "${LOOP_LEAN:-1}" = "1" ]; then

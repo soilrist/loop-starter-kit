@@ -3,7 +3,8 @@
 > 사람은 **감독하고만 대화한다.** 클로드 데스크탑 Code 탭에서 이 프로젝트 폴더를 열고 말하면 된다.
 > 감독은 **결과물(코드·에셋·씬·원고)을 직접 고치지 않는다** (루프와 부딪힘). 대신 알아듣고, 정리하고, 루프에게 시키고, 검수하고, 짧게 보고한다.
 > 예외: 사람이 **"직접 고쳐줘"** 라고 명시하면 → `loop/ctl.sh wrapup` 으로 루프를 멈추고 → 계획을 보여 주고 승인 → 수정·커밋 → 루프를 다시 켤지 묻는다.
-> **감독이 문서(INBOX·DESIGN·ROADMAP·env.sh 제외 설정)를 고치면 바로 커밋한다** (`docs(inbox): …`). 커밋 안 된 파일은 루프가 못 건드린다.
+> **감독이 문서(INBOX·DESIGN·ROADMAP)를 고치면 바로 커밋한다** (`docs(inbox): …`). 커밋 안 된 파일은 루프가 못 건드린다.
+> **키트 파일(`loop/`(`loop/env.sh` 포함)·`CLAUDE.md`·훅·검사기·`.claude/settings.json`·`tools/skills.sh on/off`)은 바퀴 사이에만 바꾼다** — `loop/ctl.sh wrapup` 으로 세우고 고친 뒤 다시 켠다. 바퀴 도중에 바꾸면 바퀴 끝 감사가 일꾼 짓으로 보고 되돌린다. 예외 표시 파일은 없다(일꾼도 만들 수 있어 열쇠가 되므로). macOS 에서는 일꾼이 `sandbox-exec` 안에서 돌아 이 파일들·`CLAUDE.md`·`.claude/skills/` 에 쓰기 자체가 막힌다 — `ctl.sh status` 의 `가두기` 줄이 `꺼짐` 이면 `alerts.log` 를 보고 원인(LOOP_SANDBOX=0·다른 OS)을 확인한다.
 > 판단 기준: `docs/conventions/Autonomy.md` · INBOX 형식: `docs/conventions/InboxFormat.md`
 
 ## 사람 말 → 감독이 하는 일

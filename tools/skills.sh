@@ -10,15 +10,18 @@ set -euo pipefail
 LIB="${SKILL_LIBRARY:-$HOME/.claude/skill-library}"
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 DEST="$ROOT/.claude/skills"
-PAID_KEYS='OPENAI_API_KEY|FAL_KEY|TRIPO_API_KEY|MESHY_API_KEY|GEMINI_API_KEY|GOOGLE_API_KEY|ELEVENLABS_API_KEY|XAI_API_KEY|SCENARIO_SDK_API_KEY|SCENARIO_API|HEYGEN_API_KEY|ARK_API_KEY|SEED_AUDIO_API_KEY|ANTHROPIC_API_KEY|REPLICATE_API|STABILITY_API'
-FREE_OK=" threejs-game-director "  # 키가 있는지 확인만 하고 부르지 않음
+# 이름 목록이 아니라 꼴로 잡는다 — 목록에 없는 새 키(OPENROUTER_API_KEY 등)도 걸리게
+PAID_KEYS='\b[A-Z][A-Z0-9_]*_(API_KEY|API_TOKEN)\b|\b(OPENAI|ANTHROPIC|GEMINI|XAI|GROQ|MISTRAL|ELEVENLABS|TRIPO|MESHY|FAL|RUNWAY|LUMA|SUNO|HF|HUGGINGFACE|REPLICATE|STABILITY|LEONARDO|KLING|SCENARIO|DEEPGRAM|COHERE|PERPLEXITY)_(KEY|TOKEN|SECRET)\b|\bAWS_SECRET_ACCESS_KEY\b|\bGOOGLE_APPLICATION_CREDENTIALS\b|\bREPLICATE_API|\bSTABILITY_API|\bSCENARIO_API'
+FREE_KEYS='^(ROBLOX[A-Z_]*|AUTH_SOURCE_API_KEY|SOME_API_KEY)$'  # 무료 서비스·예시 문자열
+FREE_OK=" majidmanzarpour_threejs-game-skills/threejs-game-director "  # 저장소/이름 — 키가 있는지 확인만 하고 부르지 않음
 
 PAID_REPOS=" scenario-labs_skills "  # 키 이름 없이 유료 MCP 크레딧으로 도는 저장소
 
 paid_use() { # 유료 근거 한 줄 (없으면 빈칸)
-  case $FREE_OK in *" $2 "*) return 0 ;; esac
-  r=${1#"$LIB/"}; case $PAID_REPOS in *" ${r%%/*} "*) echo "$LIB/${r%%/*} (유료 MCP 크레딧)"; return 0 ;; esac
-  grep -rlE "$PAID_KEYS" "$1" --exclude-dir=node_modules --exclude-dir=.venv --exclude-dir=.git 2>/dev/null | head -1 || true
+  r=${1#"$LIB/"}; case $FREE_OK in *" ${r%%/*}/$2 "*) return 0 ;; esac
+  case $PAID_REPOS in *" ${r%%/*} "*) echo "$LIB/${r%%/*} (유료 MCP 크레딧)"; return 0 ;; esac
+  grep -roE "$PAID_KEYS" "$1" --exclude-dir=node_modules --exclude-dir=.venv --exclude-dir=.git 2>/dev/null |
+    awk -F: -v free="$FREE_KEYS" '$NF !~ free { print $1 " (" $NF ")"; exit }' || true
 }
 
 index() { # 저장소<TAB>이름<TAB>폴더
@@ -49,6 +52,11 @@ case $cmd in
     index | awk -F'\t' -v w="${1:-}" -v dest="$DEST" 'tolower($0) ~ tolower(w) {
       on = (system("test -L \"" dest "/" $2 "\"") == 0) ? "켜짐 " : "     "
       print on $1 "/" $2 }' ;;
+  on|off)
+    # 켜고 끄기는 감독이 바퀴 사이에 한다 (DIRECTOR.md) — 바퀴 도중 바뀐 링크는 바퀴 끝 지문 검사가 되돌린다. --paid(돈)는 🔴
+    if [ -n "${LOOP_LAP:-}" ]; then echo "거부: 루프 일꾼은 도구를 켜고 끄지 못한다 — 필요한 도구를 INBOX 에 질문으로 (감독이 바퀴 사이에 켬)" >&2; exit 1; fi ;;
+esac
+case $cmd in
   on)
     paid=0; [ "${1:-}" = --paid ] && { paid=1; shift; }
     [ $# -gt 0 ] || { echo "on 뒤에 이름" >&2; exit 2; }
@@ -57,7 +65,7 @@ case $cmd in
       link="$DEST/${q#*/}"
       if [ -e "$link" ] && [ ! -L "$link" ]; then echo "거부: $link 는 키트·프로젝트 자체 스킬" >&2; exit 1; fi
       src=$(resolve "$q") || exit 1
-      f=$(paid_use "$src" "${q#*/}")
+      f=$(paid_use "$src" "${q#*/}")  # resolve 가 이름을 맞췄으니 q 의 이름 = 스킬 이름
       if [ -n "$f" ] && [ $paid = 0 ]; then
         echo "거부(유료): $q 는 유료 API 를 부른다 — ${f#"$LIB/"}. 무료 대안을 CATALOG 에서 찾거나, 사람이 허락하면 on --paid" >&2; exit 1
       fi

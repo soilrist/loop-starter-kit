@@ -45,7 +45,7 @@ Inbox: 고블린 이동속도
 | 꼬리말 | 언제 | 예 |
 |---|---|---|
 | `Loop:` | 루프 커밋 **전부 필수**, 값 = 이번 바퀴 번호 (훅이 대조) | `Loop: 128` |
-| `Checks:` | 루프 커밋 중 `feat·fix·data·art·refactor·perf·test·build` 는 **필수** (훅이 검사) | `Checks: L1 pass, L2 pass, L3 skip(editor off)` |
+| `Checks:` | 루프 커밋 중 `feat·fix·data·art·refactor·perf·test·build` 는 **필수** (훅이 꼴까지 검사: 층마다 `pass`·`fail`·`skip(이유)`) | `Checks: L1 pass, L2 pass, L3 skip(editor off)` |
 | `Slice:` | ROADMAP 조각을 진행한 커밋이면 필수 (감독이 검수) | `Slice: M1-03` |
 | `Inbox:` | INBOX 항목을 처리한 커밋 | `Inbox: 고블린 이동속도` |
 
@@ -62,5 +62,5 @@ Inbox: 고블린 이동속도
 ## 감독이 거절하는 커밋
 - 루프 커밋인데 조각 작업에 `Slice:` 없음 (`Loop:`·`Checks:` 는 훅이 막음)
 - 여러 조각이 섞임 / `.meta` 짝 없음
-- `Checks:` 에 "pass" 인데 STATUS 에 실제 명령 출력 인용이 없거나, `logs/lap-<번호>.log` 에 그 명령이 없음
+- `Checks:` 에 "pass" 인데 STATUS 에 실제 명령 출력 인용이 없거나, `logs/lap-<번호>.log` 에 그 명령이 없음 — 바퀴 끝 `lap_audit.py` 가 자동으로 잡아 INBOX `결함` + ROADMAP 되돌림
 - UI·캐릭터·아이템 조각인데 레퍼런스 시트 대조 없이 3층 "pass"
