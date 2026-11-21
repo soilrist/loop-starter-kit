@@ -27,5 +27,29 @@
       "Bash(rm -r -f:*)",
       "Bash(rm -r:*)"
     ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/handoff_check.py\" prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/handoff_check.py\" start",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }
