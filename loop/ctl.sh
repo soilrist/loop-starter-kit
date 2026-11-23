@@ -12,6 +12,7 @@
 #   size    매 바퀴 다시 읽히는 문서(STATUS "지금 상태"·INBOX)가 한도를 넘었는지
 #   tidy    STATUS 의 오래된 기록을 docs/archive/ 로 옮김 (tidy --dry 는 미리 보기)
 #   try     시험 두 바퀴 (claude 안 부름, 설치 확인용)
+#   wait    develop 새 커밋·alerts.log 새 줄이 생길 때까지 조용히 기다림 (감독 감시용, 백그라운드로 걸기)
 # ─────────────────────────────────────────────
 set -u
 LOOP_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -202,9 +203,17 @@ case "${1:-status}" in
     fi
     "$LOOP_PY" "$LOOP_DIR/lap_audit.py" tidy . ${2:+"$2"}
     ;;
+  wait)
+    # 감독 감시 (v3.1.3): 모델을 깨우지 않고 셸이 기다린다. 끝나면(=일이 생기면) 완료 알림이 감독을 깨운다.
+    cd "$ROOT" || exit 1
+    sig() { echo "$(git rev-parse develop 2>/dev/null) $(wc -c < logs/alerts.log 2>/dev/null || echo 0)"; }
+    start="$(sig)"
+    until [ "$(sig)" != "$start" ]; do sleep "${2:-60}"; done
+    git log develop --oneline -3; tail -n 3 logs/alerts.log 2>/dev/null
+    ;;
   try)
     LOOP_DRY_RUN=1 LOOP_MAX_LOOPS=2 LOOP_FORCE_SLEEP_SEC=1 bash "$LOOP_DIR/loop.sh"
     ;;
   *)
-    echo "사용: ctl.sh on|wrapup|off|kill|status|cost|size|tidy|try"; exit 1 ;;
+    echo "사용: ctl.sh on|wrapup|off|kill|status|cost|size|tidy|try|wait"; exit 1 ;;
 esac
