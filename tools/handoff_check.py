@@ -9,7 +9,7 @@
   selftest 자체 시험.
 
 루프 일꾼(LOOP_LAP 있음)에게는 아무것도 하지 않는다. 어떤 오류가 나도 조용히 0 으로 끝난다 (대화를 막지 않음).
-한도: 환경변수 DIRECTOR_HANDOFF_TOKENS > loop/env.sh 의 DIRECTOR_HANDOFF_TOKENS > 기본 80000.
+한도: 환경변수 DIRECTOR_HANDOFF_TOKENS > loop/env.sh 의 DIRECTOR_HANDOFF_TOKENS > 기본 100000.
 """
 import json
 import os
@@ -18,7 +18,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HANDOFF = os.path.join(ROOT, "docs", "HANDOFF.md")
-DEFAULT_LIMIT = 80000
+DEFAULT_LIMIT = 100000
 TAIL_BYTES = 4 * 1024 * 1024
 
 

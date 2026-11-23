@@ -24,8 +24,8 @@ LOOP_FALLBACK_MODEL="opus"
 # fable 등급이 실제로 부르는 모델. Fable 을 못 쓰는 계정이면 "opus" 로 바꾼다
 LOOP_HARD_MODEL="claude-fable-5-2"
 
-# 감독 세션 교대 한도 (v3.1.2, v3.1.3 에서 120k→80k): 감독 대화가 이 토큰 수를 넘으면 HANDOFF.md 에 인수인계하고 새 세션으로.
-DIRECTOR_HANDOFF_TOKENS="80000"
+# 감독 세션 교대 한도 (v3.1.2, v3.1.3 에서 120k→100k): 감독 대화가 이 토큰 수를 넘으면 HANDOFF.md 에 인수인계하고 새 세션으로.
+DIRECTOR_HANDOFF_TOKENS="100000"
 
 
 # 노력 단계 (claude --effort): low / medium / high / xhigh / max. 비우면 claude 기본값
