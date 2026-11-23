@@ -4,12 +4,13 @@
 감독 대화가 길어지면 턴마다 그 긴 대화를 통째로 다시 읽어 토큰이 갈려 나간다.
 그래서 일정 크기를 넘으면 docs/HANDOFF.md(인수인계서)에 적고 새 세션으로 넘어가게 한다.
 
-  prompt   UserPromptSubmit 훅. 이 대화의 크기(마지막 응답의 입력 토큰)가 한도를 넘으면 교대 지시를 붙인다.
+  prompt   UserPromptSubmit 훅. 대화가 시작 뒤 늘어난 양(마지막 응답 입력 토큰 − 첫 응답 입력 토큰)이 한도를 넘으면 교대 지시를 붙인다.
+           시작 크기(시스템·도구·MCP)는 교대로 줄지 않으니 빼고 잰다 — 고정 한도는 시작 크기가 큰 환경에서 첫 턴부터 교대가 걸렸다.
   start    SessionStart 훅. 인수인계서가 '상태: 넘김' 이면 새 세션에게 먼저 읽으라고 붙인다.
   selftest 자체 시험.
 
 루프 일꾼(LOOP_LAP 있음)에게는 아무것도 하지 않는다. 어떤 오류가 나도 조용히 0 으로 끝난다 (대화를 막지 않음).
-한도: 환경변수 DIRECTOR_HANDOFF_TOKENS > loop/env.sh 의 DIRECTOR_HANDOFF_TOKENS > 기본 120000.
+한도: 환경변수 DIRECTOR_HANDOFF_TOKENS > loop/env.sh 의 DIRECTOR_HANDOFF_TOKENS > 기본 50000 (늘어난 양).
 """
 import json
 import os
@@ -18,7 +19,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HANDOFF = os.path.join(ROOT, "docs", "HANDOFF.md")
-DEFAULT_LIMIT = 120000
+DEFAULT_LIMIT = 50000
 TAIL_BYTES = 4 * 1024 * 1024
 
 
@@ -34,17 +35,17 @@ def limit_tokens(root=ROOT):
     return int(v) if v.isdigit() and int(v) > 0 else DEFAULT_LIMIT
 
 
-def context_tokens(transcript_path):
-    """대화 파일 끝에서부터 마지막 assistant 응답의 usage 를 찾아 지금 대화 크기를 돌려준다."""
+def context_tokens(transcript_path, first=False):
+    """assistant 응답의 usage 로 대화 크기를 돌려준다. 기본은 마지막 응답(파일 끝), first=True 면 첫 응답(파일 앞)."""
     try:
         with open(transcript_path, "rb") as f:
             f.seek(0, 2)
             size = f.tell()
-            f.seek(max(0, size - TAIL_BYTES))
-            lines = f.read().decode("utf-8", "replace").splitlines()
+            f.seek(0 if first else max(0, size - TAIL_BYTES))
+            lines = f.read(TAIL_BYTES).decode("utf-8", "replace").splitlines()
     except OSError:
         return 0
-    for line in reversed(lines):
+    for line in (lines if first else reversed(lines)):
         if '"usage"' not in line:
             continue
         try:
@@ -73,7 +74,7 @@ def handoff_state(path=HANDOFF):
 
 
 PROMPT_MSG = (
-    "[감독 교대] 이 감독 대화가 약 {k}k 토큰으로 커졌다 (한도 {lim}k). 턴마다 이 대화 전체를 다시 읽어 비싸다. "
+    "[감독 교대] 이 감독 대화가 시작 뒤 약 {k}k 토큰 늘었다 (한도 +{lim}k). 턴마다 이 대화 전체를 다시 읽어 비싸다. "
     "지금 질문에 답한 뒤 같은 턴에서 교대한다 (loop/DIRECTOR.md '세션 교대' 절): "
     "① docs/HANDOFF.md 를 덮어써 '상태: 넘김' 과 6칸을 채우고 그 파일만 커밋 "
     "② 새 세션을 여는 도구가 있으면 'docs/HANDOFF.md 를 읽고 감독을 이어가' 로 새 세션을 열고, 없으면 사람에게 "
@@ -103,7 +104,7 @@ def run(mode, stdin_text):
     tp = data.get("transcript_path") if isinstance(data, dict) else None
     if not tp:
         return None
-    used, lim = context_tokens(tp), limit_tokens()
+    used, lim = context_tokens(tp) - context_tokens(tp, first=True), limit_tokens()
     if used >= lim:
         return ("UserPromptSubmit", PROMPT_MSG.format(k=used // 1000, lim=lim // 1000))
     return None
@@ -127,6 +128,7 @@ def selftest():
         f.write(json.dumps(small) + "\n" + "깨진 줄 \"usage\"\n" + json.dumps(big) + "\n"
                 + json.dumps({"type": "user", "message": {"role": "user", "content": "hi"}}) + "\n")
     check("마지막 assistant usage 합산", context_tokens(tp) == 150510)
+    check("첫 assistant usage", context_tokens(tp, first=True) == 3000)
     check("없는 파일은 0", context_tokens(os.path.join(d, "none.jsonl")) == 0)
     stdin = json.dumps({"transcript_path": tp})
     saved = {k: os.environ.pop(k, None) for k in ("LOOP_LAP", "DIRECTOR_HANDOFF_TOKENS")}
@@ -136,6 +138,8 @@ def selftest():
         check("한도 넘으면 교대 지시", bool(r) and r[0] == "UserPromptSubmit" and "HANDOFF" in r[1])
         os.environ["DIRECTOR_HANDOFF_TOKENS"] = "200000"
         check("한도 안이면 조용", run("prompt", stdin) is None)
+        os.environ["DIRECTOR_HANDOFF_TOKENS"] = "148000"  # 전체 150510 은 넘지만 늘어난 양 147510 은 안 넘음
+        check("시작 크기는 빼고 잰다", run("prompt", stdin) is None)
         del os.environ["DIRECTOR_HANDOFF_TOKENS"]
         os.environ["LOOP_LAP"] = "7"
         check("루프 일꾼에겐 조용", run("prompt", stdin) is None)
